@@ -1,6 +1,6 @@
-export function spaces(i) {
-    let result = '';
+export const spaces = (i: number) => {
+  let result = ''
 
-    while (i--) result += ' ';
-    return result;
+  while (i--) result += ' '
+  return result
 }

@@ -1,12 +1,12 @@
-export function counter() {
-    const counts = {};
+export const counter = () => {
+  const counts: Record<string, number> = {}
 
-    return function (label) {
-        if (label in counts) {
-            return `_${label}${counts[label]++}`;
-        }
+  return (label: string) => {
+    if (label in counts) {
+      return `_${label}${counts[label]++}`
+    }
 
-        counts[label] = 1;
-        return `_${label}`;
-    };
+    counts[label] = 1
+    return `_${label}`
+  }
 }

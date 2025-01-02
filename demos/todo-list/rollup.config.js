@@ -1,7 +1,13 @@
 import commonjs from "rollup-plugin-commonjs";
 import resolve from 'rollup-plugin-node-resolve';
-import {compile} from "./compiler/compile.js";
 import * as path from "path";
+import {generate} from '@turbo/generator'
+import {parse} from '@turbo/parser'
+
+const compile = (template, isEntryPoint) => {
+    const parsed = parse(template);
+    return generate(parsed, template, isEntryPoint);
+}
 
 function turboRollupPlugin({input}) {
     return {
@@ -16,6 +22,7 @@ function turboRollupPlugin({input}) {
                 return {
                     code: res.code,
                     map: null,
+                    minify: true
                 };
             }
 

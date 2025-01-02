@@ -5,5 +5,5 @@
 <div>
     <header>Header! {{ username() }} {{ fullname }}</header>
 
-    <button on:click="setter('Penis1')" type="button">change name</button>
+    <button on:click="setter('Alex1')" type="button">change name</button>
 </div>

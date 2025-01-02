@@ -1,4 +1,6 @@
-export function text(parser) {
+import {Parser} from '../@models/parser.model'
+
+export const text = (parser: Parser) => {
     const start = parser.index;
 
     let data = '';
@@ -7,7 +9,7 @@ export function text(parser) {
         data += parser.template[parser.index++];
     }
 
-    parser.current().children.push({
+    parser.current().children!.push({
         start,
         end: parser.index,
         type: 'Text',

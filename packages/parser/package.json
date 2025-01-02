@@ -1,0 +1,25 @@
+{
+  "name": "@turbo/parser",
+  "version": "0.0.1",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "private": true,
+  "nx": {
+    "sourceRoot": "packages/parser/src",
+    "projectType": "library",
+    "name": "parser"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.esm.js",
+      "default": "./dist/index.cjs.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "devDependencies": {
+    "estree-walker": "^3.0.3",
+    "locate-character": "^3.0.0"
+  }
+}

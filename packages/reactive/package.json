@@ -1,0 +1,22 @@
+{
+  "name": "@turbo/reactive",
+  "version": "0.0.1",
+  "dependencies": {},
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.ts",
+  "private": true,
+  "nx": {
+    "sourceRoot": "packages/reactive/src",
+    "projectType": "library",
+    "name": "reactive"
+  },
+  "module": "./dist/index.cjs.js",
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.esm.js",
+      "default": "./dist/index.cjs.js"
+    }
+  }
+}

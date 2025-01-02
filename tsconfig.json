@@ -2,5 +2,18 @@
   "extends": "./tsconfig.base.json",
   "compileOnSave": false,
   "files": [],
-  "references": []
+  "references": [
+    {
+      "path": "./packages/reactive"
+    },
+    {
+      "path": "./packages/change-detector"
+    },
+    {
+      "path": "./packages/parser"
+    },
+    {
+      "path": "./packages/generator"
+    }
+  ]
 }

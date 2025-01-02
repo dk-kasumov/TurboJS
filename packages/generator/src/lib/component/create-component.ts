@@ -1,6 +1,7 @@
 import deindent from "deindent";
+import {GeneratorStack} from '../@models/generator.model'
 
-export function bootstrapApp(current) {
+export const bootstrapApp = (current: GeneratorStack) => {
     if (!current.isEntryPoint) return;
 
     return deindent`
@@ -12,7 +13,7 @@ export function bootstrapApp(current) {
 }
 
 
-export const createComponent = (current) => {
+export const createComponent = (current: GeneratorStack) => {
     return deindent`
         function CreateComponent({ target, _props = {} }) {
             const $that = CreateComponent;

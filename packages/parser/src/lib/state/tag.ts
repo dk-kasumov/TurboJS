@@ -1,93 +1,95 @@
-import {trimEnd, trimStart} from "../utils/trim.js";
-import {readAttribute} from "./directive.js";
-import {readScript} from "../read/script.js";
-import {readStyle} from "../read/style.js";
+import {trimEnd, trimStart} from '../utils/trim.js'
+import {readAttribute} from './directive.js'
+import {readScript} from '../read/script.js'
+import {readStyle} from '../read/style.js'
+import {HTML_AST, Parser} from '../@models/parser.model'
 
-const validTagName = /^[a-zA-Z]{1,}:?[a-zA-Z0-9\-]*/;
+const validTagName = /^[a-zA-Z]{1,}:?[a-zA-Z0-9\-]*/
 const specials = {
-    script: {
-        read: readScript,
-        property: 'js'
-    },
+  script: {
+    read: readScript,
+    property: 'js'
+  },
 
-    style: {
-        read: readStyle,
-        property: 'css'
-    }
-};
-
-function readTagName(parser) {
-    const start = parser.index;
-    const name = parser.readUntil(/(\s|\/|>)/);
-
-    if (validTagName.test(name)) return name;
-
-    parser.error(`Expected valid tag name`, start)
+  style: {
+    read: readStyle,
+    property: 'css'
+  }
 }
 
-export function tag(parser) {
-    const start = parser.index++;
-    const isClosingTag = parser.eat('/');
-    const name = readTagName(parser);
+const readTagName = (parser: Parser): string | void => {
+  const start = parser.index
+  const name = parser.readUntil(/(\s|\/|>)/)
 
-    parser.allowWhitespace();
+  if (validTagName.test(name!)) return name!
 
-    if (isClosingTag) {
-        if (!parser.eat('>')) parser.error(`Expected '>'`);
+  parser.error(`Expected valid tag name`, start)
+}
 
-        const element = parser.current();
+export const tag = (parser: Parser) => {
+  const start = parser.index++
+  const isClosingTag = parser.eat('/')
+  const name = readTagName(parser)
 
-        if (element.children.length) {
-            const firstChild = element.children[0];
-            const lastChild = element.children[element.children.length - 1];
+  parser.allowWhitespace()
 
-            if (firstChild.type === 'Text') {
-                firstChild.data = trimStart(firstChild.data);
-                if (!firstChild.data) element.children.shift();
-            }
+  if (isClosingTag) {
+    if (!parser.eat('>')) parser.error(`Expected '>'`)
 
-            if (lastChild.type === 'Text') {
-                lastChild.data = trimEnd(lastChild.data);
-                if (!lastChild.data) element.children.pop();
-            }
-        }
+    const element = parser.current()
 
-        element.end = parser.index;
-        parser.stack.pop();
+    if (element?.children?.length) {
+      const firstChild = element.children[0]
+      const lastChild = element.children[element.children.length - 1]
 
-        return null;
+      if (firstChild.type === 'Text') {
+        firstChild.data = trimStart(firstChild.data!)
+        if (!firstChild.data) element.children.shift()
+      }
+
+      if (lastChild.type === 'Text') {
+        lastChild.data = trimEnd(lastChild.data!)
+        if (!lastChild.data) element.children.pop()
+      }
     }
 
-    const attributes = [];
+    element.end = parser.index
+    parser.stack.pop()
 
-    let attribute;
-    while (attribute = readAttribute(parser)) {
-        attributes.push({...attribute, tagName: name});
-        parser.allowWhitespace();
-    }
+    return null
+  }
 
-    parser.allowWhitespace();
+  const attributes: HTML_AST[] = []
 
-    if (name in specials) {
-        const special = specials[name];
+  let attribute
+  while ((attribute = readAttribute(parser))) {
+    attributes.push({...attribute, tagName: name})
+    parser.allowWhitespace()
+  }
 
-        parser.eat('>', true);
-        parser[special.property] = special.read(parser, start, attributes);
-        return;
-    }
+  parser.allowWhitespace()
 
-    const element = {
-        start,
-        end: null,
-        type: 'Element',
-        name,
-        attributes,
-        children: []
-    }
+  if (name! in specials) {
+    const special = (specials as any)[name!]
+    const property: keyof Parser = special.property
 
-    parser.current().children.push(element);
-    parser.eat('>', true);
-    parser.stack.push(element);
+    parser.eat('>', true)
+    ;(parser as any)[property] = special.read(parser, start, attributes)
+    return
+  }
 
-    return null;
+  const element: HTML_AST = {
+    start,
+    end: null,
+    type: 'Element',
+    name: name!,
+    attributes,
+    children: []
+  }
+
+  parser.current().children!.push(element)
+  parser.eat('>', true)
+  parser.stack.push(element)
+
+  return null
 }

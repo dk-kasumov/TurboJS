@@ -1,0 +1,22 @@
+{
+  "name": "@turbo/change-detector",
+  "version": "0.0.1",
+  "dependencies": {},
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.cjs.js",
+  "private": true,
+  "nx": {
+    "sourceRoot": "packages/change-detector/src",
+    "projectType": "library",
+    "name": "change-detector"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.esm.js",
+      "default": "./dist/index.cjs.js"
+    }
+  },
+  "types": "./dist/index.d.ts"
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@turbo/generator",
+  "version": "0.0.1",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "private": true,
+  "nx": {
+    "sourceRoot": "packages/generator/src",
+    "projectType": "library",
+    "name": "generator"
+  },
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.esm.js",
+      "default": "./dist/index.cjs.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "devDependencies": {
+    "deindent": "^0.1.0",
+    "estree-walker": "^3.0.3",
+    "magic-string": "^0.30.17",
+    "rollup-plugin-swc": "^0.2.1"
+  }
+}

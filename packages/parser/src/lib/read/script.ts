@@ -1,7 +1,8 @@
 import {parse, tokenizer} from 'acorn';
 import {spaces} from '../utils/spaces.js';
+import {Parser, SCRIPT_AST} from '../@models/parser.model'
 
-export function readScript(parser, start, attributes = []) {
+export const readScript = (parser: Parser, start: number, attributes = []): SCRIPT_AST => {
     const scriptStart = parser.index;
     let scriptEnd = null;
 
@@ -15,7 +16,7 @@ export function readScript(parser, start, attributes = []) {
         }
     }
 
-    const source = spaces(scriptStart) + parser.template.slice(scriptStart, scriptEnd);
+    const source = spaces(scriptStart) + parser.template.slice(scriptStart, scriptEnd!);
     const ast = parse(source, {
         ecmaVersion: 8,
         sourceType: 'module'

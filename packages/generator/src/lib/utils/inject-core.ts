@@ -1,8 +1,8 @@
 import deindent from "deindent";
 
-export const injectCore = (current) => {
+export const injectCore = () => {
     return deindent`
-        import {$state, $effect, $computed} from '../compiler/reactive/state'
-        import {$changeDetector} from '../compiler/change-detector/change-detector'
+        import {$state, $effect, $computed} from '@turbo/reactive'
+        import {$changeDetector} from '@turbo/change-detector'
     `
 }

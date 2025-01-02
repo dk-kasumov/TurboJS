@@ -1,6 +1,6 @@
 import {locate} from 'locate-character';
 
-export function ParseError(message, template, index) {
-    const {line, column} = locate(template, index);
+export const ParseError = (message: string, template: string, index: number): string => {
+    const {line, column} = locate(template, index)!;
     return `${message} (${line + 1}:${column})`;
 }
