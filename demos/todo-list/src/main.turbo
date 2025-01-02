@@ -1,0 +1,35 @@
+<script>
+    import Header from './header.turbo'
+    import {API_URL} from './constants.js'
+
+    const username = $state('Davyd')
+    const lastname = $state('Kasumov')
+
+    const fullname = $computed(() => {
+        return username() + " " + lastname()
+    }, [username, lastname])
+
+    const output = (newName) => {
+        username.set(newName)
+    }
+
+    $afterContentInit(() => {
+        console.log('content init!!')
+    })
+</script>
+
+<div>
+    <h1>Hello!</h1>
+    <div>My name: {{ username() }}</div>
+    <div>My name: {{ lastname() }}</div>
+    <div>My name: {{ fullname() }}</div>
+    <button on:click="username.set('Misha')" type="button">Click me!</button>
+
+    <Header bind:username="username" bind:fullname="'Kasumov'" bind:setter="output"></Header>
+</div>
+
+<style>
+    h1 {
+        color: red;
+    }
+</style>

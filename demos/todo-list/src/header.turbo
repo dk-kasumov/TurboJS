@@ -1,0 +1,9 @@
+<script>
+    const {username, fullname, setter} = $props()
+</script>
+
+<div>
+    <header>Header! {{ username() }} {{ fullname }}</header>
+
+    <button on:click="setter('Penis1')" type="button">change name</button>
+</div>
