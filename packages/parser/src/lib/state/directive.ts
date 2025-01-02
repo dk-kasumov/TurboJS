@@ -9,10 +9,16 @@ export const readAttribute = (parser: Parser): HTML_AST | null => {
 
   parser.allowWhitespace()
 
+  if (/^@/.test(name)) {
+    parser.eat('=', true)
+
+    return readDirectiveExpression(parser, name.slice(1), 'Directive')
+  }
+
   if (/^on:/.test(name)) {
     parser.eat('=', true)
 
-    return readEventHandlerDirective(parser, name.slice(3))
+    return readDirectiveExpression(parser, name.slice(3), 'EventHandler')
   }
 
   if (/^bind:/.test(name)) {
@@ -39,7 +45,7 @@ export const readAttribute = (parser: Parser): HTML_AST | null => {
   }
 }
 
-export const readEventHandlerDirective = (parser: Parser, name: string): HTML_AST => {
+export const readDirectiveExpression = (parser: Parser, name: string, type: 'EventHandler' | 'Directive'): HTML_AST => {
   const quoteMark = parser.eat(`'`) ? `'` : parser.eat(`"`) ? `"` : null
 
   if (!quoteMark) parser.error('Invalid quote Mark')
@@ -50,14 +56,14 @@ export const readEventHandlerDirective = (parser: Parser, name: string): HTML_AS
 
   const expression = parseExpressionAt(parser.template.slice(0, end), start, {ecmaVersion: 8})
 
-  if (expression.type !== 'CallExpression') {
+  if (expression.type !== 'CallExpression' && type === 'EventHandler') {
     parser.error(`Expected call expression`, start)
   }
 
   return {
     start,
     end,
-    type: 'EventHandler',
+    type,
     name,
     expression
   }

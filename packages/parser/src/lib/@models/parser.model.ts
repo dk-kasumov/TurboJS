@@ -8,7 +8,7 @@ export interface AcornError {
 export interface HTML_AST {
   start: number
   end: number | null
-  type: 'Fragment' | 'Text' | 'EventHandler' | 'AttributeBinding' | 'Attribute' | 'MustacheTag' | 'Element'
+  type: 'Fragment' | 'Text' | 'EventHandler' | 'AttributeBinding' | 'Attribute' | 'MustacheTag' | 'Element' | 'Directive'
   tagName?: string | void
   name?: string
   children?: HTML_AST[]

@@ -20,7 +20,7 @@ export const parse = (template: string): ParseResult => {
     // @ts-ignore
     error(message, index = this.index) {
       // @ts-ignore
-      throw new ParseError(message, this.template, index)
+      throw ParseError(message, this.template, index)
     },
 
     match(str) {

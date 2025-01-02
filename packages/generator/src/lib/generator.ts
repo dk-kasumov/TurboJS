@@ -119,6 +119,12 @@ export const generate = (parsed: ParseResult, template: string, isEntryPoint: bo
       },
       leave() {}
     },
+    Directive: {
+      enter(node) {
+        console.log(node, current.stack[current.stack.length - 1]);
+      },
+      leave() {}
+    },
     Text: {
       enter(node) {
         const parentNode = current.stack[current.stack.length - 1] ?? 'target'
