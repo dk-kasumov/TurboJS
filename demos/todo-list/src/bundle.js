@@ -204,7 +204,7 @@
     return username() + " " + lastname()
     }, [username, lastname]);
     const output = (newName) => {
-    username.set(newName);
+    username.set('Davyd');
     };
     $afterContentInit(() => {
     console.log('content init!!');
@@ -216,36 +216,42 @@
                 $that?.$onInit?.();
         target.appendChild(document.createTextNode("\n\n"));
     const _div = document.createElement('div');
+    const _div1 = document.createElement('div');
+    _div1.appendChild(document.createTextNode("hello!"));
+    _div.appendChild(_div1);
+    _div.appendChild(document.createTextNode("\n\n    "));
     const _h1 = document.createElement('h1');
     _h1.appendChild(document.createTextNode("Hello!"));
     _div.appendChild(_h1);
     _div.appendChild(document.createTextNode("\n    "));
-    const _div1 = document.createElement('div');
-    _div1.appendChild(document.createTextNode("My name: "));
-    const _mustache = document.createTextNode(username());
-    $that.$changeDetector.add({ type: 'mustache', var: _mustache, state: username(), stateRef: username });
-    _div1.appendChild(_mustache);
-    _div.appendChild(_div1);
-    _div.appendChild(document.createTextNode("\n    "));
     const _div2 = document.createElement('div');
     _div2.appendChild(document.createTextNode("My name: "));
-    const _mustache1 = document.createTextNode(lastname());
-    $that.$changeDetector.add({ type: 'mustache', var: _mustache1, state: lastname(), stateRef: lastname });
-    _div2.appendChild(_mustache1);
+    const _mustache = document.createTextNode(username());
+    $that.$changeDetector.add({ type: 'mustache', var: _mustache, state: username(), stateRef: username });
+    _div2.appendChild(_mustache);
     _div.appendChild(_div2);
     _div.appendChild(document.createTextNode("\n    "));
     const _div3 = document.createElement('div');
     _div3.appendChild(document.createTextNode("My name: "));
-    const _mustache2 = document.createTextNode(fullname());
-    $that.$changeDetector.add({ type: 'mustache', var: _mustache2, state: fullname(), stateRef: fullname });
-    _div3.appendChild(_mustache2);
+    const _mustache1 = document.createTextNode(lastname());
+    $that.$changeDetector.add({ type: 'mustache', var: _mustache1, state: lastname(), stateRef: lastname });
+    _div3.appendChild(_mustache1);
     _div.appendChild(_div3);
     _div.appendChild(document.createTextNode("\n    "));
+    const _div4 = document.createElement('div');
+    _div4.appendChild(document.createTextNode("My name: "));
+    const _mustache2 = document.createTextNode(fullname());
+    $that.$changeDetector.add({ type: 'mustache', var: _mustache2, state: fullname(), stateRef: fullname });
+    _div4.appendChild(_mustache2);
+    _div.appendChild(_div4);
+    _div.appendChild(document.createTextNode("\n\n    "));
     const _button = document.createElement('button');
     _button.addEventListener("click", () => {
        username.set('Misha');
     });
-    _button.appendChild(document.createTextNode("Click me!"));
+    const _mustache3 = document.createTextNode(username() === 'Davyd' ? 'Hello Davyd' : 'Hello Alex!');
+    $that.$changeDetector.add({ type: 'mustache', var: _mustache3, state: username() === 'Davyd' ? 'Hello Davyd' : 'Hello Alex!', stateRef: () => username() === 'Davyd' ? 'Hello Davyd' : 'Hello Alex!' });
+    _button.appendChild(_mustache3);
     _div.appendChild(_button);
     _div.appendChild(document.createTextNode("\n\n    "));
     const $$Header = CreateComponent$1({target: _div, _props: { username: username, fullname: 'Kasumov', setter: output } });

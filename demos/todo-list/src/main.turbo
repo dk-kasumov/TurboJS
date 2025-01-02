@@ -10,7 +10,7 @@
     }, [username, lastname])
 
     const output = (newName) => {
-        username.set(newName)
+        username.set('Davyd')
     }
 
     $afterContentInit(() => {
@@ -19,11 +19,16 @@
 </script>
 
 <div>
+    <div @name="username">hello!</div>
+
     <h1>Hello!</h1>
     <div>My name: {{ username() }}</div>
     <div>My name: {{ lastname() }}</div>
     <div>My name: {{ fullname() }}</div>
-    <button on:click="username.set('Misha')" type="button">Click me!</button>
+
+    <button on:click="username.set('Misha')" type="button">
+        {{username() === 'Davyd' ? 'Hello Davyd' : 'Hello Alex!' }}
+    </button>
 
     <Header bind:username="username" bind:fullname="'Kasumov'" bind:setter="output"></Header>
 </div>
