@@ -45,3 +45,49 @@ export function partitionModuleBody(
   }
   return { keep, setup };
 }
+
+export type IOKind = "input" | "inputRequired" | "output";
+
+export interface IOBinding {
+  name: string;
+  kind: IOKind;
+  declarator: t.VariableDeclarator;
+  call: t.CallExpression;
+}
+
+function ioKind(callee: t.Node): IOKind | null {
+  if (t.isIdentifier(callee)) {
+    if (callee.name === "input") return "input";
+    if (callee.name === "output") return "output";
+    return null;
+  }
+  if (
+    t.isMemberExpression(callee) &&
+    !callee.computed &&
+    t.isIdentifier(callee.object, { name: "input" }) &&
+    t.isIdentifier(callee.property, { name: "required" })
+  ) {
+    return "inputRequired";
+  }
+  return null;
+}
+
+export function collectIO(setup: t.Statement[]): IOBinding[] {
+  const bindings: IOBinding[] = [];
+  for (const stmt of setup) {
+    if (!t.isVariableDeclaration(stmt)) continue;
+    for (const declarator of stmt.declarations) {
+      if (!t.isIdentifier(declarator.id)) continue;
+      if (!declarator.init || !t.isCallExpression(declarator.init)) continue;
+      const kind = ioKind(declarator.init.callee);
+      if (!kind) continue;
+      bindings.push({
+        name: declarator.id.name,
+        kind,
+        declarator,
+        call: declarator.init,
+      });
+    }
+  }
+  return bindings;
+}

@@ -2,9 +2,11 @@ import { parse } from "@babel/parser";
 import * as t from "@babel/types";
 import type { CodeMapping } from "@volar/language-core";
 import {
+  collectIO,
   findDefaultExport,
   isFactoryDeclaration,
   partitionModuleBody,
+  type IOBinding,
 } from "@turbo/compiler";
 
 export interface TransformResult {
@@ -70,6 +72,25 @@ function findPropsType(keep: t.Statement[]): string {
   return "TurboProps";
 }
 
+function emitMember(
+  builder: VirtualBuilder,
+  source: string,
+  binding: IOBinding,
+): void {
+  const id = binding.declarator.id as t.Identifier;
+  builder.text("  ");
+  builder.copy(source, id.start!, id.end!);
+  if (binding.kind === "inputRequired") {
+    builder.text(`: TurboInputValue<typeof ${binding.name}>;\n`);
+  } else if (binding.kind === "output") {
+    builder.text(
+      `?: (value: TurboOutputValue<typeof ${binding.name}>) => void;\n`,
+    );
+  } else {
+    builder.text(`?: TurboInputValue<typeof ${binding.name}>;\n`);
+  }
+}
+
 export function transform(source: string): TransformResult {
   let ast: t.File;
   try {
@@ -90,7 +111,7 @@ export function transform(source: string): TransformResult {
   }
 
   const { keep, setup } = partitionModuleBody(ast.program.body, def);
-  const propsType = findPropsType(keep);
+  const io = collectIO(setup);
   const returnAnnotation =
     t.isJSXElement(decl) || t.isJSXFragment(decl) ? ": JSX.Element" : "";
 
@@ -99,6 +120,25 @@ export function transform(source: string): TransformResult {
     builder.copy(source, stmt.start!, stmt.end!);
     builder.text("\n");
   }
+
+  if (io.length > 0) {
+    for (const stmt of setup) {
+      builder.copy(source, stmt.start!, stmt.end!);
+      builder.text("\n");
+    }
+    builder.text("type __TurboProps = {\n");
+    for (const binding of io) emitMember(builder, source, binding);
+    builder.text("};\n");
+    builder.text(
+      `const __turbo_default = (_$props: __TurboProps)${returnAnnotation} => {\n`,
+    );
+    builder.text("return (\n");
+    builder.copy(source, decl.start!, decl.end!);
+    builder.text("\n);\n};\nexport default __turbo_default;\n");
+    return builder.result();
+  }
+
+  const propsType = findPropsType(keep);
   builder.text(
     `const __turbo_default = (props: ${propsType})${returnAnnotation} => {\n`,
   );

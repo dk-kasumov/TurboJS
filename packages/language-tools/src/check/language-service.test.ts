@@ -113,4 +113,36 @@ describe("editor path (TypeScript language service plugin)", () => {
     expect(tokens).toContain("title");
     expect(tokens).toContain("bogus");
   });
+
+  it("infers an output callback parameter from typeof (no implicit any)", () => {
+    const { ls } = buildService(`${FIXTURES}/input-output/tsconfig.json`);
+    const app = path.resolve(`${FIXTURES}/input-output/App.tsx`);
+    const codes = ls.getSemanticDiagnostics(app).map((d) => d.code);
+    expect(codes).not.toContain(7006);
+  });
+
+  it("navigates from a parent prop to the child input() declaration", () => {
+    const { ls } = buildService(`${FIXTURES}/input-output/tsconfig.json`);
+    const app = path.resolve(`${FIXTURES}/input-output/App.tsx`);
+    const appText = fs.readFileSync(app, "utf8");
+    const position = appText.indexOf('name="hi"');
+    expect(position).toBeGreaterThan(0);
+
+    const result = ls.getDefinitionAndBoundSpan(app, position);
+    const target = result?.definitions?.find((d) =>
+      d.fileName.endsWith("Greeting.tsx"),
+    );
+    expect(target, "no definition mapped into Greeting.tsx").toBeTruthy();
+
+    const greetingText = fs.readFileSync(target!.fileName, "utf8");
+    const span = greetingText.slice(
+      target!.textSpan.start,
+      target!.textSpan.start + target!.textSpan.length,
+    );
+    expect(span).toBe("name");
+    expect(greetingText.slice(0, target!.textSpan.start)).toMatch(/const $/);
+    expect(greetingText.slice(target!.textSpan.start)).toMatch(
+      /^name = input\(/,
+    );
+  });
 });

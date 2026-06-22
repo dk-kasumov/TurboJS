@@ -1,9 +1,9 @@
-interface Props {
-  title: string;
-}
+import { input } from "@turbo/core";
+
+const title = input.required<string>();
 
 export default (
   <header>
-    <h1 data-testid="title">{props.title}</h1>
+    <h1 data-testid="title">{title()}</h1>
   </header>
 );
