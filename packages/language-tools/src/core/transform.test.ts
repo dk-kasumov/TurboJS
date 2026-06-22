@@ -119,4 +119,46 @@ describe("transform", () => {
     expect(code).toBe(source);
     expect(mappings.length).toBe(1);
   });
+
+  it("derives a Props type from input()/output() bindings", () => {
+    const source = [
+      'import { input, output } from "@turbo/core";',
+      'const title = input("");',
+      "const count = input.required<number>();",
+      "const submit = output<string>();",
+      "export default (",
+      "  <button onClick={() => submit.emit(title())}>{count()}</button>",
+      ");",
+    ].join("\n");
+
+    const { code } = transform(source);
+
+    expect(code).toContain("type __TurboProps = {");
+    expect(code).toContain("title?: TurboInputValue<typeof title>;");
+    expect(code).toContain("count: TurboInputValue<typeof count>;");
+    expect(code).toContain(
+      "submit?: (value: TurboOutputValue<typeof submit>) => void;",
+    );
+    expect(code).toContain(
+      "const __turbo_default = (_$props: __TurboProps): JSX.Element => {",
+    );
+    expect(code).toContain("export default __turbo_default;");
+  });
+
+  it("lifts input/output setup above the factory so typeof is in scope", () => {
+    const source = [
+      'import { input } from "@turbo/core";',
+      'const title = input("");',
+      "export default (<p>{title()}</p>);",
+    ].join("\n");
+
+    const { code } = transform(source);
+
+    expect(code.indexOf('const title = input("")')).toBeLessThan(
+      code.indexOf("type __TurboProps"),
+    );
+    expect(code.indexOf("type __TurboProps")).toBeLessThan(
+      code.indexOf("const __turbo_default"),
+    );
+  });
 });

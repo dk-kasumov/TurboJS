@@ -199,3 +199,45 @@ describe("component as value", () => {
     ).toThrow(/fragments/);
   });
 });
+
+describe("input/output bindings", () => {
+  it("binds input() to a named prop with its default", () => {
+    const out = compileOk(
+      `import { input } from "@turbo/core";
+       const title = input("hi");
+       export default <p>{title()}</p>;`,
+    );
+    const n = norm(out);
+    expect(n).toContain("export default function (_$props) {");
+    expect(n).toContain('const title = _$input(_$props, "title", "hi")');
+    expect(out).toContain('import { _$input } from "@turbo/core"');
+  });
+
+  it("binds input.required() without a default", () => {
+    const out = compileOk(
+      `import { input } from "@turbo/core";
+       const count = input.required<number>();
+       export default <p>{count()}</p>;`,
+    );
+    const n = norm(out);
+    expect(n).toContain('const count = _$inputRequired(_$props, "count")');
+    expect(out).toContain('import { _$inputRequired } from "@turbo/core"');
+  });
+
+  it("binds output() to a named prop and keeps emit() calls", () => {
+    const out = compileOk(
+      `import { output } from "@turbo/core";
+       const submit = output<string>();
+       export default <button onClick={() => submit.emit("x")}>go</button>;`,
+    );
+    const n = norm(out);
+    expect(n).toContain('const submit = _$output(_$props, "submit")');
+    expect(n).toContain('submit.emit("x")');
+  });
+
+  it("keeps the plain props factory when no input/output is used", () => {
+    const out = compileOk(`export default <p>{count()}</p>;`);
+    expect(norm(out)).toContain("export default function (props) {");
+    expect(out).not.toContain("@turbo/core");
+  });
+});

@@ -7,7 +7,10 @@ export {
   findDefaultExport,
   isFactoryDeclaration,
   partitionModuleBody,
+  collectIO,
   type ModulePartition,
+  type IOBinding,
+  type IOKind,
 } from "./module-shape.ts";
 
 export function compile(code: string, filename = "input.tsx"): CompileResult {

@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@turbo/core": "workspace:*",
     "@turbo/reactivity": "workspace:*",
     "@turbo/runtime": "workspace:*"
   },

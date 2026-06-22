@@ -26,6 +26,9 @@ importers:
 
   examples/counter:
     dependencies:
+      '@turbo/core':
+        specifier: workspace:*
+        version: link:../../packages/core
       '@turbo/reactivity':
         specifier: workspace:*
         version: link:../../packages/reactivity
@@ -70,6 +73,12 @@ importers:
       '@types/babel__traverse':
         specifier: ^7.28.0
         version: 7.28.0
+
+  packages/core:
+    dependencies:
+      '@turbo/reactivity':
+        specifier: workspace:*
+        version: link:../reactivity
 
   packages/language-tools:
     dependencies:

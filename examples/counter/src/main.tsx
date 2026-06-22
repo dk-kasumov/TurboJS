@@ -1,9 +1,11 @@
 import Header from "./Header";
 import Counter from "./Counter";
+import Greeting from "./Greeting";
 import { signal, memo } from "@turbo/reactivity";
 
 const title = signal("turbo counters");
 const show = signal(true);
+const greeting = signal("(no greeting yet)");
 
 const Boxed = () => <div class="boxed">case 3 — thunk value-component</div>;
 const Computed = memo(() =>
@@ -30,6 +32,9 @@ export default (
 
     <Computed />
     <Boxed />
+
+    <Greeting name="turbo" greet={(message) => greeting.set(message)} />
+    <p data-testid="greeting">{greeting()}</p>
 
     <div data-testid="dynamic">
       <Dynamic />

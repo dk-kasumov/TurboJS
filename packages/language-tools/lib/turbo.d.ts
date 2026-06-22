@@ -1,5 +1,8 @@
 type TurboProps = Record<string, any>;
 
+type TurboInputValue<S> = S extends () => infer T ? T : never;
+type TurboOutputValue<O> = O extends { emit(value: infer T): void } ? T : never;
+
 type TurboChild = Node | string | number | boolean | null | undefined;
 type TurboChildren = TurboChild | TurboChildren[];
 

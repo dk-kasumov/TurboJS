@@ -42,6 +42,23 @@ describe("check (turbo-check)", () => {
     expect(tokens).toContain("bogus");
   });
 
+  it("passes input/output components and their call sites", () => {
+    const result = check(fixture("input-output/tsconfig.json"));
+    expect(result.errorCount, result.format()).toBe(0);
+  });
+
+  it("flags wrong-type and unknown input/output props at the call site", () => {
+    const result = check(fixture("input-output-fail/tsconfig.json"));
+    const appErrors = result.diagnostics.filter((d) =>
+      d.file?.fileName.endsWith("App.tsx"),
+    );
+    expect(appErrors.length, result.format()).toBeGreaterThanOrEqual(2);
+
+    const tokens = appErrors.map(authoredSlice);
+    expect(tokens).toContain("count");
+    expect(tokens).toContain("who");
+  });
+
   it("maps an error inside a wrapped component back to the authored position", () => {
     const result = check(fixture("wrapped-error/tsconfig.json"));
     const err = result.diagnostics.find((d) =>
