@@ -1,0 +1,38 @@
+{
+  "name": "@turbo/vscode",
+  "displayName": "Turbo",
+  "description": "Type-checking and editor support for the turbo framework",
+  "version": "0.0.0",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "vscode": "^1.88.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "onLanguage:typescriptreact"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "typescriptServerPlugins": [
+      {
+        "name": "@turbo/typescript-plugin",
+        "enableForWorkspaceTypeScriptVersions": true
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch"
+  },
+  "dependencies": {
+    "@turbo/typescript-plugin": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@types/vscode": "^1.88.0",
+    "esbuild": "^0.24.0"
+  }
+}

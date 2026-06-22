@@ -25,7 +25,7 @@ export function signal<T>(initial: T) {
       observers.add(activeReaction);
       activeReaction.deps.add(observers);
     }
-
+    
     return value;
   }
 

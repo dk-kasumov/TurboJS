@@ -4,6 +4,6 @@ interface Props {
 
 export default (
   <header>
-    <h1 data-testid="title">{props.title}</h1>
+    <h1>{props.titel}</h1>
   </header>
 );

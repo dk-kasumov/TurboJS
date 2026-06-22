@@ -13,6 +13,8 @@
     "@turbo/runtime": "workspace:*"
   },
   "devDependencies": {
+    "@turbo/language-tools": "workspace:*",
+    "@turbo/typescript-plugin": "workspace:*",
     "@turbo/vite-plugin": "workspace:*",
     "vite": "^6.0.5"
   }

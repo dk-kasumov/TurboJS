@@ -1,0 +1,31 @@
+{
+  "name": "@turbo/language-tools",
+  "version": "0.0.0",
+  "type": "module",
+  "types": "./lib/turbo.d.ts",
+  "exports": {
+    ".": "./src/core/language-plugin.ts",
+    "./check": "./src/check/index.ts",
+    "./turbo.d.ts": "./lib/turbo.d.ts"
+  },
+  "bin": {
+    "turbo-check": "./src/check/cli.ts"
+  },
+  "files": [
+    "lib",
+    "src"
+  ],
+  "dependencies": {
+    "@babel/parser": "^7.26.3",
+    "@babel/types": "^7.26.3",
+    "@turbo/compiler": "workspace:*",
+    "@volar/language-core": "^2.4.28",
+    "@volar/typescript": "^2.4.28"
+  },
+  "peerDependencies": {
+    "typescript": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0"
+  }
+}
