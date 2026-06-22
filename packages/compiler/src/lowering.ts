@@ -10,6 +10,7 @@ import {
   Template,
   Part,
   InsertPart,
+  ComponentPart,
   AttributePart,
   EventPart,
 } from "./ir.ts";
@@ -38,7 +39,7 @@ function normalizeText(raw: string): string {
   return lines.join(" ");
 }
 
-const elementName = (node: JSXElement): string =>
+export const elementName = (node: JSXElement): string =>
   (node.openingElement.name as any).name as string;
 
 const attrName = (attr: JSXAttribute): string =>
@@ -51,7 +52,7 @@ const isExprValue = (
   value.type === "JSXExpressionContainer" &&
   t.isExpression(value.expression);
 
-const isComponentElement = (node: JSXElement): boolean => {
+export const isComponentElement = (node: JSXElement): boolean => {
   const name = node.openingElement.name;
   return name.type === "JSXIdentifier" && isComponentName(name.name);
 };
@@ -130,19 +131,19 @@ export class TemplateLowerer {
 
   private childElement(node: JSXElement, path: number[], parts: Part[]): string {
     if (isComponentElement(node)) {
-      parts.push(new InsertPart(path, this.componentCall(node), false));
+      parts.push(
+        new ComponentPart(path, elementName(node), this.componentProps(node)),
+      );
       return "<!>";
     }
     return this.element(node, path, parts);
   }
 
-  private componentCall(node: JSXElement): t.CallExpression {
+  componentProps(node: JSXElement): t.ObjectExpression {
     const props = node.openingElement.attributes
       .map((attr) => this.prop(attr))
       .filter((p): p is t.ObjectProperty | t.ObjectMethod => p !== null);
-    return t.callExpression(t.identifier(elementName(node)), [
-      t.objectExpression(props),
-    ]);
+    return t.objectExpression(props);
   }
 
   private prop(

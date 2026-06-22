@@ -1,7 +1,7 @@
 import * as t from "@babel/types";
 
 export const RUNTIME_HELPERS = [
-  "template", "insert", "effect", "setAttr", "on", "nodeAt",
+  "template", "insert", "effect", "setAttr", "on", "nodeAt", "createComponent",
 ] as const;
 
 export type RuntimeHelper = (typeof RUNTIME_HELPERS)[number];
@@ -41,6 +41,37 @@ export class InsertPart extends Part {
       : this.expr;
     return t.expressionStatement(
       t.callExpression(runtime.use("insert"), [ref, value]),
+    );
+  }
+}
+
+export function createComponentCall(
+  name: string,
+  props: t.Expression,
+  runtime: RuntimeUse,
+): t.CallExpression {
+  return t.callExpression(runtime.use("createComponent"), [
+    t.identifier(name),
+    props,
+  ]);
+}
+
+export class ComponentPart extends Part {
+  readonly name: string;
+  readonly props: t.Expression;
+
+  constructor(path: number[], name: string, props: t.Expression) {
+    super(path);
+    this.name = name;
+    this.props = props;
+  }
+
+  emit({ ref, runtime }: EmitContext): t.Statement {
+    return t.expressionStatement(
+      t.callExpression(runtime.use("insert"), [
+        ref,
+        createComponentCall(this.name, this.props, runtime),
+      ]),
     );
   }
 }

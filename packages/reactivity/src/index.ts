@@ -1,75 +1,184 @@
-import {Accessor, Callback, Reaction, WritableSignal} from './types'
+import { Accessor, Callback, Reaction, Source, WritableSignal } from "./types";
 
 let activeReaction: Reaction | null = null;
+let activeOwner: Reaction | null = null;
 
-function unsubscribe(r: Reaction) {
-  for (const dep of r.deps) {
-    dep.delete(r);
-  }
+let batchDepth = 0;
+let flushing = false;
+const queue = new Set<Reaction>();
 
-  r.deps.clear();
-
-  for (const cleanup of r.cleanups) {
-    cleanup();
-  }
-
-  r.cleanups.length = 0;
+function notify(observers: Source): void {
+  for (const observer of [...observers]) queue.add(observer);
+  if (batchDepth === 0) flush();
 }
 
-export function signal<T>(initial: T) {
+function flush(): void {
+  if (flushing) return;
+  flushing = true;
+
+  try {
+    while (queue.size > 0) {
+      const pending = [...queue];
+      queue.clear();
+      for (const reaction of pending) reaction.run();
+    }
+  } finally {
+    flushing = false;
+  }
+}
+
+export function batch<T>(fn: () => T): T {
+  batchDepth++;
+
+  try {
+    return fn();
+  } finally {
+    batchDepth--;
+    if (batchDepth === 0) flush();
+  }
+}
+
+function dispose(reaction: Reaction): void {
+  for (const child of reaction.owned) dispose(child);
+  reaction.owned.length = 0;
+
+  for (const source of reaction.deps) source.delete(reaction);
+  reaction.deps.clear();
+
+  for (const cleanup of reaction.cleanups) cleanup();
+  reaction.cleanups.length = 0;
+}
+
+function adopt(reaction: Reaction): void {
+  reaction.owner = activeOwner;
+  activeOwner?.owned.push(reaction);
+}
+
+function detach(reaction: Reaction): void {
+  const owned = reaction.owner?.owned;
+  if (!owned) return;
+  const index = owned.indexOf(reaction);
+  if (index >= 0) owned.splice(index, 1);
+}
+
+function track<T>(reaction: Reaction, fn: () => T): T {
+  const prevReaction = activeReaction;
+  const prevOwner = activeOwner;
+  activeReaction = reaction;
+  activeOwner = reaction;
+
+  try {
+    return fn();
+  } finally {
+    activeReaction = prevReaction;
+    activeOwner = prevOwner;
+  }
+}
+
+function observe(source: Source): void {
+  if (!activeReaction) return;
+  source.add(activeReaction);
+  activeReaction.deps.add(source);
+}
+
+const ACCESSOR = Symbol("turbo.accessor");
+
+function brand<T extends object>(value: T): T {
+  Object.defineProperty(value, ACCESSOR, { value: true });
+  return value;
+}
+
+export function isAccessor(value: unknown): value is Accessor<unknown> {
+  return typeof value === "function" && ACCESSOR in value;
+}
+
+export function signal<T>(initial: T): WritableSignal<T> {
   let value = initial;
-  const observers = new Set<Reaction>();
+  const observers: Source = new Set();
 
   const read = () => {
-    if (activeReaction) {
-      observers.add(activeReaction);
-      activeReaction.deps.add(observers);
-    }
-    
+    observe(observers);
     return value;
-  }
+  };
 
   read.set = (next: T) => {
     if (Object.is(next, value)) return;
     value = next;
-
-    for (const observer of [...observers]) {
-      observer.run();
-    }
+    notify(observers);
   };
 
+  brand(read);
   return read as WritableSignal<T>;
 }
 
 export function effect(fn: Callback): Callback {
-  const reaction = Reaction.from();
-  reaction.run = () => {
-    unsubscribe(reaction);
-    const prev = activeReaction;
-    activeReaction = reaction;
+  const reaction = new Reaction();
+  adopt(reaction);
 
-    try {
-      fn();
-    } finally {
-      activeReaction = prev;
-    }
+  reaction.run = () => {
+    dispose(reaction);
+    track(reaction, fn);
   };
 
   reaction.run();
 
-  return () => unsubscribe(reaction);
+  return () => {
+    dispose(reaction);
+    detach(reaction);
+  };
 }
 
 export function memo<T>(fn: () => T): Accessor<T> {
-  const s = signal<T>(undefined as T);
-  effect(() => s.set(fn()));
-  return () => s();
+  const reaction = new Reaction();
+  adopt(reaction);
+
+  const observers: Source = new Set();
+  let value: T;
+  let stale = true;
+
+  reaction.run = () => {
+    if (stale) return;
+    stale = true;
+    for (const observer of [...observers]) queue.add(observer);
+  };
+
+  const read = () => {
+    observe(observers);
+    if (stale) {
+      dispose(reaction);
+      value = track(reaction, fn);
+      stale = false;
+    }
+    return value;
+  };
+
+  brand(read);
+  return read;
+}
+
+export function createRoot<T>(fn: (dispose: Callback) => T): T {
+  const root = new Reaction();
+  adopt(root);
+  const prevReaction = activeReaction;
+  const prevOwner = activeOwner;
+  activeReaction = null;
+  activeOwner = root;
+
+  try {
+    return fn(() => {
+      dispose(root);
+      detach(root);
+    });
+  } finally {
+    activeReaction = prevReaction;
+    activeOwner = prevOwner;
+  }
 }
 
 export function untrack<T>(fn: () => T): T {
   const prev = activeReaction;
   activeReaction = null;
-  
+
   try {
     return fn();
   } finally {
@@ -77,6 +186,6 @@ export function untrack<T>(fn: () => T): T {
   }
 }
 
-export function onCleanup(fn: () => void): void {
-  if (activeReaction) activeReaction.cleanups.push(fn);
+export function onCleanup(fn: Callback): void {
+  if (activeOwner) activeOwner.cleanups.push(fn);
 }

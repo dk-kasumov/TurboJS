@@ -1,9 +1,14 @@
 import type { NodePath } from "@babel/traverse";
 import type { JSXElement, JSXFragment } from "@babel/types";
 import { Parser } from "./parser.ts";
-import { TemplateLowerer } from "./lowering.ts";
+import {
+  TemplateLowerer,
+  isComponentElement,
+  elementName,
+} from "./lowering.ts";
 import { FactoryTransform } from "./transforms.ts";
 import { RuntimeRegistry, TemplateEmitter, ModuleEmitter } from "./codegen.ts";
+import { createComponentCall } from "./ir.ts";
 
 export interface CompileResult {
   code: string;
@@ -21,26 +26,45 @@ export class Compiler {
     const ast = this.parser.parse(code);
     const runtime = new RuntimeRegistry();
     const templates: string[] = [];
+    let didCompile = false;
 
-    const isRoot = (path: NodePath) =>
-      !path.findParent((p) => p.isJSXElement() || p.isJSXFragment());
+    const isRenderRoot = (path: NodePath): boolean => {
+      const parent = path.parentPath;
+      return !(parent != null && (parent.isJSXElement() || parent.isJSXFragment()));
+    };
 
     this.parser.traverse(ast, {
-      JSXElement: (path: NodePath<JSXElement>) => {
-        if (!isRoot(path)) return;
-        const template = this.lowerer.lower(path.node);
-        const iife = this.emitter.emit(template, templates.length, runtime);
-        templates.push(template.html);
-        path.replaceWith(iife);
-        path.skip();
+      JSXElement: {
+        exit: (path: NodePath<JSXElement>) => {
+          if (!isRenderRoot(path)) return;
+          didCompile = true;
+
+          if (isComponentElement(path.node)) {
+            path.replaceWith(
+              createComponentCall(
+                elementName(path.node),
+                this.lowerer.componentProps(path.node),
+                runtime,
+              ),
+            );
+            return;
+          }
+
+          const template = this.lowerer.lower(path.node);
+          const iife = this.emitter.emit(template, templates.length, runtime);
+          templates.push(template.html);
+          path.replaceWith(iife);
+        },
       },
-      JSXFragment: (path: NodePath<JSXFragment>) => {
-        if (!isRoot(path)) return;
-        throw new Error("turbo: JSX fragments are not supported yet");
+      JSXFragment: {
+        exit: (path: NodePath<JSXFragment>) => {
+          if (!isRenderRoot(path)) return;
+          throw new Error("turbo: JSX fragments are not supported yet");
+        },
       },
     });
 
-    if (templates.length === 0) {
+    if (!didCompile) {
       const out = this.parser.generate(ast, filename, code);
       return { code: out.code, map: out.map };
     }

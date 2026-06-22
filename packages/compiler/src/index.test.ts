@@ -49,11 +49,11 @@ describe("compile", () => {
     expect(out).toContain('_$effect(() => _$setAttr(_el$, "value", v()))');
   });
 
-  it("compiles a component to a call inserted statically", () => {
+  it("inserts a child component via createComponent", () => {
     const out = compileOk(
       `export default <div><Hello name="x" /></div>;`,
     );
-    expect(norm(out)).toContain('Hello({ "name": "x" })');
+    expect(norm(out)).toContain('_$createComponent(Hello, { "name": "x" })');
     expect(out).toContain("_$insert(");
   });
 
@@ -98,5 +98,104 @@ describe("component model (factory wrap)", () => {
     const out = compileOk(`export default (props) => <p>{props.x}</p>;`);
     expect(out).toContain("props => ");
     expect(out).not.toContain("function (props)");
+  });
+});
+
+describe("conditional rendering", () => {
+  it("lowers component branches of a conditional inside an expression", () => {
+    const out = compileOk(
+      `export default <div>{cond() ? <Header /> : <Fallback />}</div>;`,
+    );
+    expect(norm(out)).toContain(
+      "() => cond() ? _$createComponent(Header, {}) : _$createComponent(Fallback, {})",
+    );
+    expect(out).not.toContain("<Header");
+    expect(out).not.toContain("<Fallback");
+  });
+
+  it("lowers DOM-element branches of a conditional to templates", () => {
+    const out = compileOk(
+      `export default <div>{cond() ? <a href="x" /> : <b />}</div>;`,
+    );
+    expect(out).toContain('_$template("<a href=\\"x\\"></a>")');
+    expect(out).toContain('_$template("<b></b>")');
+    expect(norm(out)).toContain("() => cond() ?");
+  });
+
+  it("lowers nested conditionals", () => {
+    const out = compileOk(
+      `export default <div>{a() ? (b() ? <X /> : <Y />) : <Z />}</div>;`,
+    );
+    const n = norm(out);
+    expect(n).toContain("_$createComponent(X, {})");
+    expect(n).toContain("_$createComponent(Y, {})");
+    expect(n).toContain("_$createComponent(Z, {})");
+  });
+
+  it("lowers JSX that appears in a component prop value", () => {
+    const out = compileOk(
+      `export default <div><Card icon={<Icon />} /></div>;`,
+    );
+    expect(norm(out)).toContain(
+      'get "icon"() { return _$createComponent(Icon, {}); }',
+    );
+    expect(out).not.toContain("<Icon");
+  });
+});
+
+describe("component as value", () => {
+  it("compiles a root component despite emitting no templates", () => {
+    const out = compileOk(`export default <C />;`);
+    const n = norm(out);
+    expect(n).toContain("export default function (props) {");
+    expect(n).toContain("return _$createComponent(C, {});");
+    expect(out).toContain('from "@turbo/runtime"');
+    expect(out).not.toContain("_$template");
+    expect(out).not.toContain("<C");
+  });
+
+  it("passes props to a root component", () => {
+    const out = compileOk(`export default <C x={y()} t="hi" />;`);
+    const n = norm(out);
+    expect(n).toContain('get "x"() { return y(); }');
+    expect(n).toContain('"t": "hi"');
+  });
+
+  it("compiles a memo whose body returns conditional JSX (case 2)", () => {
+    const out = compileOk(
+      `const C = memo(() => cond() ? <A /> : <B />);
+       export default <div><C /></div>;`,
+    );
+    const n = norm(out);
+    expect(n).toContain(
+      "memo(() => cond() ? _$createComponent(A, {}) : _$createComponent(B, {}))",
+    );
+    expect(n).toContain("_$insert(_n$0, _$createComponent(C, {}))");
+  });
+
+  it("compiles a JSX node value used as a component (case 3)", () => {
+    const out = compileOk(
+      `const C = <div>123</div>;
+       export default <section><C /></section>;`,
+    );
+    const n = norm(out);
+    expect(n).toContain("const C = (() =>");
+    expect(n).toContain("_$createComponent(C, {})");
+  });
+
+  it("compiles a signal of JSX used as a component (case 4)", () => {
+    const out = compileOk(
+      `const C = signal<JSX.Element>(<div />);
+       export default <p><C /></p>;`,
+    );
+    const n = norm(out);
+    expect(n).toContain("signal<JSX.Element>((() =>");
+    expect(n).toContain("_$createComponent(C, {})");
+  });
+
+  it("throws on a fragment used as a conditional branch", () => {
+    expect(() =>
+      compile(`export default <div>{cond() ? <>x</> : null}</div>;`),
+    ).toThrow(/fragments/);
   });
 });

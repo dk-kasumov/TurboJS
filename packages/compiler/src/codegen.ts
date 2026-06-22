@@ -85,7 +85,7 @@ export class TemplateEmitter {
 
 export class ModuleEmitter {
   headerStatements(runtime: RuntimeRegistry, templates: string[]): t.Statement[] {
-    runtime.use("template");
+    if (templates.length > 0) runtime.use("template");
     const tmplDecls = templates.map((html, i) =>
       t.variableDeclaration("const", [
         t.variableDeclarator(

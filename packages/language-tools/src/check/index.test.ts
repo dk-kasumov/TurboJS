@@ -24,6 +24,11 @@ describe("check (turbo-check)", () => {
     expect(result.errorCount, result.format()).toBe(0);
   });
 
+  it("passes conditional rendering and value components", () => {
+    const result = check(fixture("value-components/tsconfig.json"));
+    expect(result.errorCount, result.format()).toBe(0);
+  });
+
   it("flags missing, wrong-type, and unknown props at the authored call site", () => {
     const result = check(fixture("fail/tsconfig.json"));
     const appErrors = result.diagnostics.filter((d) =>

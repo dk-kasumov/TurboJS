@@ -1,4 +1,4 @@
-import { effect } from "@turbo/reactivity";
+import { batch, createRoot, effect, untrack, isAccessor } from "@turbo/reactivity";
 
 export { effect };
 
@@ -23,6 +23,7 @@ export function nodeAt(root: Node, path: number[]): Node {
 }
 
 function toNodes(value: unknown): Node[] {
+  if (typeof value === "function") return toNodes((value as () => unknown)());
   if (value == null || value === false || value === true) return [];
 
   if (Array.isArray(value)) return value.flatMap(toNodes);
@@ -70,18 +71,32 @@ export function setAttr(el: Element, name: string, value: unknown): void {
 
 export type Component<P = any> = (props: P) => Node;
 
+export function createComponent(component: unknown, props: any): unknown {
+  if (isAccessor(component)) return () => component();
+  if (typeof component === "function") return untrack(() => component(props));
+  return component;
+}
+
 export function render(
   component: Component,
   container: Element | string,
-): Node {
+): () => void {
   const el =
     typeof container === "string"
       ? document.querySelector(container)
       : container;
   if (!el) throw new Error(`turbo: render target not found: ${container}`);
-  const node = component({});
-  el.appendChild(node);
-  return node;
+
+  return createRoot((dispose) => {
+    let resolved: unknown = component({});
+    while (typeof resolved === "function") resolved = (resolved as () => unknown)();
+    const node = resolved as Node;
+    el.appendChild(node);
+    return () => {
+      dispose();
+      if (node.parentNode === el) el.removeChild(node);
+    };
+  });
 }
 
 export function on(
@@ -89,7 +104,11 @@ export function on(
   type: string,
   handler: EventListenerOrEventListenerObject,
 ): void {
-  el.addEventListener(type, handler);
+  if (typeof handler === "function") {
+    el.addEventListener(type, (event) => batch(() => handler(event)));
+  } else {
+    el.addEventListener(type, handler);
+  }
 }
 
 

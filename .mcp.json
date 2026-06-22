@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "CodeGraphContext": {
+      "type": "stdio",
+      "command": "/Users/davydkasumov/.local/bin/codegraphcontext",
+      "args": [
+        "mcp",
+        "start"
+      ],
+      "env": {}
+    }
+  }
+}
