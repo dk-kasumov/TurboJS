@@ -1,4 +1,7 @@
+import { brand, isAccessor } from "./accessor";
 import { Accessor, Callback, Reaction, Source, WritableSignal } from "./types";
+
+export { isAccessor };
 
 let activeReaction: Reaction | null = null;
 let activeOwner: Reaction | null = null;
@@ -7,8 +10,12 @@ let batchDepth = 0;
 let flushing = false;
 const queue = new Set<Reaction>();
 
+function enqueue(observers: Source): void {
+  for (const observer of observers) queue.add(observer);
+}
+
 function notify(observers: Source): void {
-  for (const observer of [...observers]) queue.add(observer);
+  enqueue(observers);
   if (batchDepth === 0) flush();
 }
 
@@ -61,11 +68,15 @@ function detach(reaction: Reaction): void {
   if (index >= 0) owned.splice(index, 1);
 }
 
-function track<T>(reaction: Reaction, fn: () => T): T {
+function runWith<T>(
+  reaction: Reaction | null,
+  owner: Reaction | null,
+  fn: () => T,
+): T {
   const prevReaction = activeReaction;
   const prevOwner = activeOwner;
   activeReaction = reaction;
-  activeOwner = reaction;
+  activeOwner = owner;
 
   try {
     return fn();
@@ -79,17 +90,6 @@ function observe(source: Source): void {
   if (!activeReaction) return;
   source.add(activeReaction);
   activeReaction.deps.add(source);
-}
-
-const ACCESSOR = Symbol("turbo.accessor");
-
-function brand<T extends object>(value: T): T {
-  Object.defineProperty(value, ACCESSOR, { value: true });
-  return value;
-}
-
-export function isAccessor(value: unknown): value is Accessor<unknown> {
-  return typeof value === "function" && ACCESSOR in value;
 }
 
 export function signal<T>(initial: T): WritableSignal<T> {
@@ -117,7 +117,7 @@ export function effect(fn: Callback): Callback {
 
   reaction.run = () => {
     dispose(reaction);
-    track(reaction, fn);
+    runWith(reaction, reaction, fn);
   };
 
   reaction.run();
@@ -139,14 +139,14 @@ export function memo<T>(fn: () => T): Accessor<T> {
   reaction.run = () => {
     if (stale) return;
     stale = true;
-    for (const observer of [...observers]) queue.add(observer);
+    enqueue(observers);
   };
 
   const read = () => {
     observe(observers);
     if (stale) {
       dispose(reaction);
-      value = track(reaction, fn);
+      value = runWith(reaction, reaction, fn);
       stale = false;
     }
     return value;
@@ -159,31 +159,17 @@ export function memo<T>(fn: () => T): Accessor<T> {
 export function createRoot<T>(fn: (dispose: Callback) => T): T {
   const root = new Reaction();
   adopt(root);
-  const prevReaction = activeReaction;
-  const prevOwner = activeOwner;
-  activeReaction = null;
-  activeOwner = root;
 
-  try {
-    return fn(() => {
+  return runWith(null, root, () =>
+    fn(() => {
       dispose(root);
       detach(root);
-    });
-  } finally {
-    activeReaction = prevReaction;
-    activeOwner = prevOwner;
-  }
+    }),
+  );
 }
 
 export function untrack<T>(fn: () => T): T {
-  const prev = activeReaction;
-  activeReaction = null;
-
-  try {
-    return fn();
-  } finally {
-    activeReaction = prev;
-  }
+  return runWith(null, activeOwner, fn);
 }
 
 export function onCleanup(fn: Callback): void {

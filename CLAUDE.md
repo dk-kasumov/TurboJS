@@ -46,14 +46,15 @@ in the wrong layer. See `.claude/skills/solid-gof`.
 
 | Path | Role |
 | --- | --- |
-| `packages/reactivity` | signals, `effect`, `memo`, `untrack`, `onCleanup` — change detection |
-| `packages/runtime` | DOM contract: `template`, `nodeAt`, `insert`, `setAttr`, `on`, `render` |
-| `packages/compiler` | TSX → fine-grained DOM JS (Babel parse → IR → codegen) |
+| `packages/reactivity` | signals, `effect`, `memo`, `batch`, `untrack`, `onCleanup`, `createRoot` — change detection |
+| `packages/runtime` | DOM contract: `template`, `nodeAt`, `insert`, `setAttr`, `on`, `createComponent`, `render` |
+| `packages/compiler` | TSX → fine-grained DOM JS (5-stage pipeline under `src/stages`: parse → lower → factory → header → generate) |
+| `packages/core` | authoring API: `input`, `output`, `onDestroy` (compiler rewrites these to `_$input`/`_$output`) |
 | `packages/vite-plugin` | `enforce: "pre"` Vite transform that runs the compiler |
 | `packages/language-tools` | Volar virtual code + `turbo-check` CLI + `turbo.d.ts` JSX types |
 | `packages/typescript-plugin` | wraps language-tools as a TS Server plugin (editor) |
 | `packages/language-tools-vscode` | thin VS Code extension that registers the plugin |
-| `examples/counter` | working demo, also the Playwright e2e target |
+| `examples/turbofocus` | working demo (Pomodoro timer), also the Playwright e2e target |
 
 ## Commands
 
@@ -61,9 +62,9 @@ in the wrong layer. See `.claude/skills/solid-gof`.
 pnpm install
 pnpm test          # Vitest unit tests (all packages) — run after every change
 pnpm test:watch
-pnpm e2e           # Playwright against examples/counter
-pnpm --filter counter dev
-pnpm --filter counter build
+pnpm e2e           # Playwright against examples/turbofocus
+pnpm --filter turbofocus dev
+pnpm --filter turbofocus build
 node packages/language-tools/src/check/cli.ts <tsconfig.json>   # turbo-check type checker
 ```
 
@@ -80,42 +81,41 @@ tests). Only `typescript-plugin` and `language-tools-vscode` have an esbuild bui
 - **Compiler tests** must re-`parse()` the output (prove no leftover JSX) and match
   structure with whitespace-normalized substrings — never assert Babel's exact formatting.
 - TS with `moduleResolution: "Bundler"` and `allowImportingTsExtensions` — imports use
-  explicit `.ts` extensions (`import { Parser } from "./parser.ts"`).
+  explicit `.ts` extensions (`import { lower } from "./stages/02-lower/lower.ts"`).
 - One small step at a time; keep `pnpm test` green between steps.
 
 ## The two transforms that must stay in sync
 
 The "module → `(props) => view`" wrap exists **twice**:
 
-1. `packages/compiler/src/transforms.ts` (`FactoryTransform`) — produces the *runtime*
+1. `packages/compiler/src/stages/03-factory/factory.ts` (`factory`) — produces the *runtime*
    factory that actually executes.
 2. `packages/language-tools/src/core/transform.ts` (`transform`) — produces a *type-checkable*
    virtual TSX (`const __turbo_default = (props: Props): JSX.Element => {...}`) with source
    mappings so errors land on the authored code.
 
 Both share helpers from `packages/compiler/src/module-shape.ts` (`findDefaultExport`,
-`isFactoryDeclaration`, `partitionModuleBody`). **If you change the component model, change
-both** or the editor will type-check a program that differs from what runs. The props type
-is found by convention: a top-level `interface Props` / `type Props`, else `TurboProps`
-(= `Record<string, any>`, i.e. unchecked).
+`isFactoryDeclaration`, `partitionModuleBody`, `collectIO`). **If you change the component
+model, change both** or the editor will type-check a program that differs from what runs. The
+props type is found by convention: a top-level `interface Props` / `type Props`, else a type
+derived from `input()`/`output()` bindings, else `TurboProps` (= `Record<string, any>`,
+unchecked).
 
 ## Gotchas / current limitations
 
+- **Conditionals and lists work** — lowering recurses into expressions, so
+  `{cond() ? <a/> : <b/>}` and `{items().map(x => <li/>)}` compile. But **lists are not
+  keyed** — `insert` replaces a list's nodes wholesale on any change.
 - **No fragment support** — root `<>...</>` throws; nested fragments throw.
-- **No JSX inside `{...}`** — `{cond ? <a/> : <b/>}` leaves raw JSX in the output (the
-  compiler only lowers *root* JSX). This blocks idiomatic conditionals and lists.
-- **Components ignore children** — `componentCall` only maps attributes; `<Card>x</Card>`
-  drops `x`. No slots.
+- **Components ignore children** — only attributes are mapped; `<Card>x</Card>` drops `x`. No slots.
 - **No `ref`** — `ref={el}` is treated as an ordinary attribute (`setAttr("ref", …)`).
-- **Reactivity has an owner tree, `batch`, lazy `memo`, and `createRoot`** (see
-  `packages/reactivity/src/index.ts` and ARCHITECTURE §4). `render` returns a **disposer**, not
-  a `Node`. The scheduler is synchronous but **not fully glitch-free** (a sink reading both a
-  source and a memo of that source can run twice) and has **no cycle detection**.
+- **Reactivity scheduler** is synchronous but **not fully glitch-free** (a sink reading both a
+  source and a memo of that source can run twice) and has **no cycle detection**. `render`
+  returns a **disposer**, not a `Node`.
 - **`setAttr` always uses `setAttribute`** — DOM *properties* like an input's live `value`
   or `checked` are not set; controlled inputs won't fully work.
 - **`getLanguageId` treats every `.tsx` as a turbo module** (falls back to identity if there
   is no default export or it is already a function).
-- The Playwright e2e (`e2e/counter.spec.ts`) references a `double` memo / `data-testid="double"`
-  that `examples/counter/src/Counter.tsx` does **not** have — the e2e is stale and will fail.
 
-See `ARCHITECTURE.md` for the full data flow, IR, and design-pattern rationale.
+Each package has a `README.md` with its design and data flow; the compiler's stages are
+documented per-folder under `packages/compiler/src/stages`.

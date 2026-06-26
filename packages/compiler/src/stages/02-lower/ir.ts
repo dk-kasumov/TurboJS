@@ -1,14 +1,5 @@
 import * as t from "@babel/types";
-
-export const RUNTIME_HELPERS = [
-  "template", "insert", "effect", "setAttr", "on", "nodeAt", "createComponent",
-] as const;
-
-export type RuntimeHelper = (typeof RUNTIME_HELPERS)[number];
-
-export interface RuntimeUse {
-  use(helper: RuntimeHelper): t.Identifier;
-}
+import type { RuntimeUse } from "../../utils/runtime.utils.ts";
 
 export interface EmitContext {
   ref: t.Expression;

@@ -1,7 +1,4 @@
-import { Compiler, type CompileResult } from "./compiler.ts";
-
-export type { CompileResult };
-export { Compiler };
+export { compile, type CompileResult } from "./compile.ts";
 
 export {
   findDefaultExport,
@@ -12,7 +9,3 @@ export {
   type IOBinding,
   type IOKind,
 } from "./module-shape.ts";
-
-export function compile(code: string, filename = "input.tsx"): CompileResult {
-  return new Compiler().compile(code, filename);
-}

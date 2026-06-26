@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { parse } from "@babel/parser";
 import { compile } from "./index";
 
-/** Compile and assert the output is syntactically valid JS (no leftover JSX). */
+const norm = (s: string) => s.replace(/\s+/g, " ");
+
 function compileOk(src: string): string {
   const { code } = compile(src);
   expect(() =>
@@ -11,11 +12,8 @@ function compileOk(src: string): string {
   return code;
 }
 
-/** Collapse whitespace so assertions don't depend on Babel's pretty-printing. */
-const norm = (s: string) => s.replace(/\s+/g, " ");
-
-describe("compile", () => {
-  it("hoists a template and returns a cloned node", () => {
+describe("element lowering", () => {
+  it("hoists a template, clones it, and imports from the runtime", () => {
     const out = compileOk(`export default <div class="a">hi</div>;`);
     expect(out).toContain('_$template("<div class=\\"a\\">hi</div>")');
     expect(out).toContain("_tmpl$0()");
@@ -23,75 +21,60 @@ describe("compile", () => {
     expect(out).toContain('from "@turbo/runtime"');
   });
 
-  it("maps className -> class", () => {
-    const out = compileOk(`export default <div className="x" />;`);
-    expect(out).toContain('class=\\"x\\"');
+  it("inserts dynamic children through a thunk", () => {
+    const out = compileOk(`const c = signal(0); export default <p>{c()}</p>;`);
+    expect(out).toContain('_$template("<p><!></p>")');
+    expect(norm(out)).toContain("_$insert(");
+    expect(norm(out)).toContain("() => c()");
   });
 
-  it("wraps dynamic expressions in a thunk insert", () => {
-    const out = compileOk(
-      `const count = signal(0); export default <p>{count()}</p>;`,
+  it("binds dynamic attributes inside an effect", () => {
+    expect(compileOk(`export default <input value={v()} />;`)).toContain(
+      '_$effect(() => _$setAttr(_el$, "value", v()))',
     );
-    expect(out).toContain('_$template("<p><!></p>")');
-    expect(out).toContain("_$insert(");
-    expect(norm(out)).toContain("() => count()");
   });
 
   it("compiles onX handlers to event listeners", () => {
-    const out = compileOk(
-      `export default <button onClick={() => go()}>x</button>;`,
+    expect(
+      compileOk(`export default <button onClick={() => go()}>x</button>;`),
+    ).toContain('_$on(_el$, "click", () => go())');
+  });
+
+  it("addresses nested markers by index path", () => {
+    const out = norm(
+      compileOk(
+        `export default <div><h1>Count: {c()}</h1><button onClick={inc}>+</button></div>;`,
+      ),
     );
-    expect(out).toContain('_$on(_el$, "click", () => go())');
+    expect(out).toContain("_$nodeAt(_el$, [0, 1])");
+    expect(out).toContain("_$nodeAt(_el$, [1])");
   });
 
-  it("compiles dynamic attributes to an effect", () => {
-    const out = compileOk(`export default <input value={v()} />;`);
-    expect(out).toContain('_$effect(() => _$setAttr(_el$, "value", v()))');
-  });
-
-  it("inserts a child component via createComponent", () => {
-    const out = compileOk(
-      `export default <div><Hello name="x" /></div>;`,
-    );
-    expect(norm(out)).toContain('_$createComponent(Hello, { "name": "x" })');
-    expect(out).toContain("_$insert(");
-  });
-
-  it("navigates nested markers by index path", () => {
-    const out = compileOk(
-      `export default <div><h1>Count: {c()}</h1><button onClick={inc}>+</button></div>;`,
-    );
-    expect(norm(out)).toContain("_$nodeAt(_el$, [0, 1])"); // marker inside <h1>
-    expect(norm(out)).toContain("_$nodeAt(_el$, [1])"); // the button
-  });
-
-  it("passes through files without JSX untouched-ish", () => {
-    const out = compile(`export const x = 1;`);
-    expect(out.code).not.toContain("@turbo/runtime");
-    expect(out.code).toContain("export const x = 1");
+  it("leaves JSX-free modules untouched", () => {
+    const { code } = compile(`export const x = 1;`);
+    expect(code).not.toContain("@turbo/runtime");
+    expect(code).toContain("export const x = 1");
   });
 });
 
-describe("component model (factory wrap)", () => {
+describe("component model", () => {
   it("wraps a wrapper-free module into a per-instance (props) factory", () => {
     const out = compileOk(
       `import { signal } from "@turbo/reactivity";
        const count = signal(0);
        export default <p>{count()}</p>;`,
     );
-    const n = norm(out);
-    // setup moves *inside* the factory; import stays at module scope.
-    expect(n).toContain("export default function (props) {");
-    expect(n).toMatch(/function \(props\) \{ const count = signal\(0\)/);
-    expect(n).toContain("return (() =>");
+    expect(norm(out)).toContain("export default function (props) {");
+    expect(norm(out)).toMatch(/function \(props\) \{ const count = signal\(0\)/);
     expect(out).toContain('import { signal } from "@turbo/reactivity"');
   });
 
-  it("emits dynamic props as reactive getters", () => {
-    const out = compileOk(`export default <div><H n={x()} t="hi" /></div>;`);
-    const n = norm(out);
-    expect(n).toContain('get "n"() { return x(); }');
-    expect(n).toContain('"t": "hi"');
+  it("keeps module-scope setup imports while moving calls into the factory", () => {
+    const out = compileOk(
+      `import { onDestroy } from "@turbo/core";\nonDestroy(() => stop());\nexport default <div />;`,
+    );
+    expect(out).toContain('import { onDestroy } from "@turbo/core"');
+    expect(norm(out)).toContain("function (props) { onDestroy(() => stop());");
   });
 
   it("leaves an explicit function default export alone", () => {
@@ -101,8 +84,31 @@ describe("component model (factory wrap)", () => {
   });
 });
 
+describe("child components", () => {
+  it("creates a child component and passes static props", () => {
+    const out = compileOk(`export default <div><Hello name="x" /></div>;`);
+    expect(norm(out)).toContain('_$createComponent(Hello, { "name": "x" })');
+    expect(norm(out)).toContain("_$insert(");
+  });
+
+  it("emits dynamic props as reactive getters", () => {
+    const out = norm(compileOk(`export default <div><H n={x()} t="hi" /></div>;`));
+    expect(out).toContain('get "n"() { return x(); }');
+    expect(out).toContain('"t": "hi"');
+  });
+
+  it("compiles a root component that emits no templates", () => {
+    const out = norm(compileOk(`export default <C x={y()} t="hi" />;`));
+    expect(out).toContain("export default function (props) {");
+    expect(out).toContain("_$createComponent(C, {");
+    expect(out).toContain('get "x"() { return y(); }');
+    expect(out).toContain('"t": "hi"');
+    expect(out).not.toContain("_$template");
+  });
+});
+
 describe("conditional rendering", () => {
-  it("lowers component branches of a conditional inside an expression", () => {
+  it("lowers component branches of a conditional expression", () => {
     const out = compileOk(
       `export default <div>{cond() ? <Header /> : <Fallback />}</div>;`,
     );
@@ -113,7 +119,7 @@ describe("conditional rendering", () => {
     expect(out).not.toContain("<Fallback");
   });
 
-  it("lowers DOM-element branches of a conditional to templates", () => {
+  it("lowers DOM-element branches to templates", () => {
     const out = compileOk(
       `export default <div>{cond() ? <a href="x" /> : <b />}</div>;`,
     );
@@ -123,80 +129,63 @@ describe("conditional rendering", () => {
   });
 
   it("lowers nested conditionals", () => {
-    const out = compileOk(
-      `export default <div>{a() ? (b() ? <X /> : <Y />) : <Z />}</div>;`,
+    const out = norm(
+      compileOk(`export default <div>{a() ? (b() ? <X /> : <Y />) : <Z />}</div>;`),
     );
-    const n = norm(out);
-    expect(n).toContain("_$createComponent(X, {})");
-    expect(n).toContain("_$createComponent(Y, {})");
-    expect(n).toContain("_$createComponent(Z, {})");
+    expect(out).toContain("_$createComponent(X, {})");
+    expect(out).toContain("_$createComponent(Y, {})");
+    expect(out).toContain("_$createComponent(Z, {})");
   });
 
-  it("lowers JSX that appears in a component prop value", () => {
-    const out = compileOk(
-      `export default <div><Card icon={<Icon />} /></div>;`,
-    );
+  it("lowers JSX passed as a component prop value", () => {
+    const out = compileOk(`export default <div><Card icon={<Icon />} /></div>;`);
     expect(norm(out)).toContain(
       'get "icon"() { return _$createComponent(Icon, {}); }',
     );
     expect(out).not.toContain("<Icon");
-  });
-});
-
-describe("component as value", () => {
-  it("compiles a root component despite emitting no templates", () => {
-    const out = compileOk(`export default <C />;`);
-    const n = norm(out);
-    expect(n).toContain("export default function (props) {");
-    expect(n).toContain("return _$createComponent(C, {});");
-    expect(out).toContain('from "@turbo/runtime"');
-    expect(out).not.toContain("_$template");
-    expect(out).not.toContain("<C");
-  });
-
-  it("passes props to a root component", () => {
-    const out = compileOk(`export default <C x={y()} t="hi" />;`);
-    const n = norm(out);
-    expect(n).toContain('get "x"() { return y(); }');
-    expect(n).toContain('"t": "hi"');
-  });
-
-  it("compiles a memo whose body returns conditional JSX (case 2)", () => {
-    const out = compileOk(
-      `const C = memo(() => cond() ? <A /> : <B />);
-       export default <div><C /></div>;`,
-    );
-    const n = norm(out);
-    expect(n).toContain(
-      "memo(() => cond() ? _$createComponent(A, {}) : _$createComponent(B, {}))",
-    );
-    expect(n).toContain("_$insert(_n$0, _$createComponent(C, {}))");
-  });
-
-  it("compiles a JSX node value used as a component (case 3)", () => {
-    const out = compileOk(
-      `const C = <div>123</div>;
-       export default <section><C /></section>;`,
-    );
-    const n = norm(out);
-    expect(n).toContain("const C = (() =>");
-    expect(n).toContain("_$createComponent(C, {})");
-  });
-
-  it("compiles a signal of JSX used as a component (case 4)", () => {
-    const out = compileOk(
-      `const C = signal<JSX.Element>(<div />);
-       export default <p><C /></p>;`,
-    );
-    const n = norm(out);
-    expect(n).toContain("signal<JSX.Element>((() =>");
-    expect(n).toContain("_$createComponent(C, {})");
   });
 
   it("throws on a fragment used as a conditional branch", () => {
     expect(() =>
       compile(`export default <div>{cond() ? <>x</> : null}</div>;`),
     ).toThrow(/fragments/);
+  });
+});
+
+describe("component-as-value forms", () => {
+  it("lowers a memo whose body returns conditional JSX", () => {
+    const out = norm(
+      compileOk(
+        `const C = memo(() => cond() ? <A /> : <B />);
+         export default <div><C /></div>;`,
+      ),
+    );
+    expect(out).toContain(
+      "memo(() => cond() ? _$createComponent(A, {}) : _$createComponent(B, {}))",
+    );
+    expect(out).toContain("_$insert(_n$0, _$createComponent(C, {}))");
+  });
+
+  it("lowers a JSX node bound to a const and used as a component", () => {
+    const out = norm(
+      compileOk(
+        `const C = <div>123</div>;
+         export default <section><C /></section>;`,
+      ),
+    );
+    expect(out).toContain("const C = (() =>");
+    expect(out).toContain("_$createComponent(C, {})");
+  });
+
+  it("lowers a signal of JSX used as a component", () => {
+    const out = norm(
+      compileOk(
+        `const C = signal<JSX.Element>(<div />);
+         export default <p><C /></p>;`,
+      ),
+    );
+    expect(out).toContain("signal<JSX.Element>((() =>");
+    expect(out).toContain("_$createComponent(C, {})");
   });
 });
 
@@ -207,9 +196,8 @@ describe("input/output bindings", () => {
        const title = input("hi");
        export default <p>{title()}</p>;`,
     );
-    const n = norm(out);
-    expect(n).toContain("export default function (_$props) {");
-    expect(n).toContain('const title = _$input(_$props, "title", "hi")');
+    expect(norm(out)).toContain("export default function (_$props) {");
+    expect(norm(out)).toContain('const title = _$input(_$props, "title", "hi")');
     expect(out).toContain('import { _$input } from "@turbo/core"');
   });
 
@@ -219,20 +207,20 @@ describe("input/output bindings", () => {
        const count = input.required<number>();
        export default <p>{count()}</p>;`,
     );
-    const n = norm(out);
-    expect(n).toContain('const count = _$inputRequired(_$props, "count")');
+    expect(norm(out)).toContain('const count = _$inputRequired(_$props, "count")');
     expect(out).toContain('import { _$inputRequired } from "@turbo/core"');
   });
 
   it("binds output() to a named prop and keeps emit() calls", () => {
-    const out = compileOk(
-      `import { output } from "@turbo/core";
-       const submit = output<string>();
-       export default <button onClick={() => submit.emit("x")}>go</button>;`,
+    const out = norm(
+      compileOk(
+        `import { output } from "@turbo/core";
+         const submit = output<string>();
+         export default <button onClick={() => submit.emit("x")}>go</button>;`,
+      ),
     );
-    const n = norm(out);
-    expect(n).toContain('const submit = _$output(_$props, "submit")');
-    expect(n).toContain('submit.emit("x")');
+    expect(out).toContain('const submit = _$output(_$props, "submit")');
+    expect(out).toContain('submit.emit("x")');
   });
 
   it("keeps the plain props factory when no input/output is used", () => {

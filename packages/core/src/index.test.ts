@@ -1,16 +1,18 @@
 import { describe, it, expect, vi } from "vitest";
-import { signal, effect } from "@turbo/reactivity";
-import { input, output, _$input, _$inputRequired, _$output } from "./index";
+import { signal, effect, createRoot } from "@turbo/reactivity";
+import {
+  input,
+  output,
+  onDestroy,
+  _$input,
+  _$inputRequired,
+  _$output,
+} from "./index";
 
 describe("_$input", () => {
-  it("falls back to the default when the prop is absent", () => {
-    const title = _$input({}, "title", "fallback");
-    expect(title()).toBe("fallback");
-  });
-
-  it("reads the prop when present", () => {
-    const title = _$input({ title: "given" }, "title", "fallback");
-    expect(title()).toBe("given");
+  it("reads the prop when present, else the default", () => {
+    expect(_$input({}, "title", "fallback")()).toBe("fallback");
+    expect(_$input({ title: "given" }, "title", "fallback")()).toBe("given");
   });
 
   it("tracks a reactive prop getter", () => {
@@ -56,5 +58,21 @@ describe("authoring facades", () => {
     expect(() => input("")).toThrow();
     expect(() => input.required<number>()).toThrow();
     expect(() => output()).toThrow();
+  });
+});
+
+describe("onDestroy", () => {
+  it("fires when the owning scope is disposed", () => {
+    const cleanup = vi.fn();
+    let disposeScope!: () => void;
+
+    createRoot((dispose) => {
+      disposeScope = dispose;
+      onDestroy(cleanup);
+    });
+
+    expect(cleanup).not.toHaveBeenCalled();
+    disposeScope();
+    expect(cleanup).toHaveBeenCalledTimes(1);
   });
 });
