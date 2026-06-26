@@ -1,5 +1,7 @@
 import { memo } from "@turbo/reactivity";
 
+export { onCleanup as onDestroy } from "@turbo/reactivity";
+
 export interface InputSignal<T> {
   (): T;
 }

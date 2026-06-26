@@ -37,30 +37,29 @@ export function insert(marker: Node, value: unknown): void {
     throw new Error("Turbo: insert marker has no parent");
   }
 
-  if (typeof value !== 'function') {
-    for (const node of toNodes(value)) {
-      parent.insertBefore(node, marker);
-    }
+  if (typeof value !== "function") {
+    for (const node of toNodes(value)) parent.insertBefore(node, marker);
     return;
   }
 
   let current: Node[] = [];
-  
   effect(() => {
-    const next = toNodes((value as () => unknown)());
-    if (
-      current.length === 1 &&
-      next.length === 1 &&
-      current[0].nodeType === 3 &&
-      next[0].nodeType === 3
-    ) {
-      (current[0] as Text).data = (next[0] as Text).data;
-      return;
-    }
-    for (const n of current) if (n.parentNode === parent) parent.removeChild(n);
-    for (const n of next) parent.insertBefore(n, marker);
-    current = next;
+    current = reconcile(parent, marker, current, toNodes((value as () => unknown)()));
   });
+}
+
+function isText(node: Node): node is Text {
+  return node.nodeType === 3;
+}
+
+function reconcile(parent: Node, marker: Node, current: Node[], next: Node[]): Node[] {
+  if (current.length === 1 && next.length === 1 && isText(current[0]) && isText(next[0])) {
+    current[0].data = next[0].data;
+    return current;
+  }
+  for (const n of current) if (n.parentNode === parent) parent.removeChild(n);
+  for (const n of next) parent.insertBefore(n, marker);
+  return next;
 }
 
 export function setAttr(el: Element, name: string, value: unknown): void {
@@ -88,13 +87,11 @@ export function render(
   if (!el) throw new Error(`turbo: render target not found: ${container}`);
 
   return createRoot((dispose) => {
-    let resolved: unknown = component({});
-    while (typeof resolved === "function") resolved = (resolved as () => unknown)();
-    const node = resolved as Node;
-    el.appendChild(node);
+    const nodes = toNodes(component({}));
+    for (const node of nodes) el.appendChild(node);
     return () => {
       dispose();
-      if (node.parentNode === el) el.removeChild(node);
+      for (const node of nodes) if (node.parentNode === el) el.removeChild(node);
     };
   });
 }

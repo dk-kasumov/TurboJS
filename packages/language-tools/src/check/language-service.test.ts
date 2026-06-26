@@ -86,7 +86,7 @@ function authoredSlice(d: ts.Diagnostic): string {
 const FIXTURES = "packages/language-tools/test/fixtures";
 
 describe("editor path (TypeScript language service plugin)", () => {
-  it("reports no semantic errors for a correct magic-props component + call site", () => {
+  it("reports no semantic errors for a correct magic-props component + call site (incl. no ts(2604) on component elements)", () => {
     const { ls, tsxFiles } = buildService(`${FIXTURES}/pass/tsconfig.json`);
     for (const file of tsxFiles) {
       const messages = ls
@@ -94,13 +94,6 @@ describe("editor path (TypeScript language service plugin)", () => {
         .map((d) => ts.flattenDiagnosticMessageText(d.messageText, "\n"));
       expect(messages, file).toEqual([]);
     }
-  });
-
-  it("does not report ts(2604) 'no call signatures' on a component element", () => {
-    const { ls } = buildService(`${FIXTURES}/pass/tsconfig.json`);
-    const app = path.resolve(`${FIXTURES}/pass/App.tsx`);
-    const codes = ls.getSemanticDiagnostics(app).map((d) => d.code);
-    expect(codes).not.toContain(2604);
   });
 
   it("reports mapped prop errors at the authored call site", () => {

@@ -7,6 +7,7 @@ import {
   isFactoryDeclaration,
   partitionModuleBody,
   type IOBinding,
+  type IOKind,
 } from "@turbo/compiler";
 
 export interface TransformResult {
@@ -14,12 +15,22 @@ export interface TransformResult {
   mappings: CodeMapping[];
 }
 
+const FACTORY = "__turbo_default";
+const PROPS_TYPE = "__TurboProps";
+const PROPS_PARAM = "_$props";
+
 const FULL_FEATURES: CodeMapping["data"] = {
   verification: true,
   completion: true,
   semantic: true,
   navigation: true,
   structure: true,
+};
+
+const MEMBER_SUFFIX: Record<IOKind, (name: string) => string> = {
+  inputRequired: (name) => `: TurboInputValue<typeof ${name}>`,
+  output: (name) => `?: (value: TurboOutputValue<typeof ${name}>) => void`,
+  input: (name) => `?: TurboInputValue<typeof ${name}>`,
 };
 
 class VirtualBuilder {
@@ -38,6 +49,13 @@ class VirtualBuilder {
     this.generatedOffsets.push(this.code.length);
     this.lengths.push(end - start);
     this.code += source.slice(start, end);
+  }
+
+  statements(source: string, statements: t.Statement[]): void {
+    for (const stmt of statements) {
+      this.copy(source, stmt.start!, stmt.end!);
+      this.text("\n");
+    }
   }
 
   result(): TransformResult {
@@ -72,23 +90,19 @@ function findPropsType(keep: t.Statement[]): string {
   return "TurboProps";
 }
 
-function emitMember(
+function emitPropsType(
   builder: VirtualBuilder,
   source: string,
-  binding: IOBinding,
+  io: IOBinding[],
 ): void {
-  const id = binding.declarator.id as t.Identifier;
-  builder.text("  ");
-  builder.copy(source, id.start!, id.end!);
-  if (binding.kind === "inputRequired") {
-    builder.text(`: TurboInputValue<typeof ${binding.name}>;\n`);
-  } else if (binding.kind === "output") {
-    builder.text(
-      `?: (value: TurboOutputValue<typeof ${binding.name}>) => void;\n`,
-    );
-  } else {
-    builder.text(`?: TurboInputValue<typeof ${binding.name}>;\n`);
+  builder.text(`type ${PROPS_TYPE} = {\n`);
+  for (const binding of io) {
+    const id = binding.declarator.id as t.Identifier;
+    builder.text("  ");
+    builder.copy(source, id.start!, id.end!);
+    builder.text(`${MEMBER_SUFFIX[binding.kind](binding.name)};\n`);
   }
+  builder.text("};\n");
 }
 
 export function transform(source: string): TransformResult {
@@ -112,43 +126,25 @@ export function transform(source: string): TransformResult {
 
   const { keep, setup } = partitionModuleBody(ast.program.body, def);
   const io = collectIO(setup);
+  const usesIO = io.length > 0;
   const returnAnnotation =
     t.isJSXElement(decl) || t.isJSXFragment(decl) ? ": JSX.Element" : "";
+  const params = usesIO
+    ? `${PROPS_PARAM}: ${PROPS_TYPE}`
+    : `props: ${findPropsType(keep)}`;
 
   const builder = new VirtualBuilder();
-  for (const stmt of keep) {
-    builder.copy(source, stmt.start!, stmt.end!);
-    builder.text("\n");
+  builder.statements(source, keep);
+  if (usesIO) {
+    builder.statements(source, setup);
+    emitPropsType(builder, source, io);
   }
 
-  if (io.length > 0) {
-    for (const stmt of setup) {
-      builder.copy(source, stmt.start!, stmt.end!);
-      builder.text("\n");
-    }
-    builder.text("type __TurboProps = {\n");
-    for (const binding of io) emitMember(builder, source, binding);
-    builder.text("};\n");
-    builder.text(
-      `const __turbo_default = (_$props: __TurboProps)${returnAnnotation} => {\n`,
-    );
-    builder.text("return (\n");
-    builder.copy(source, decl.start!, decl.end!);
-    builder.text("\n);\n};\nexport default __turbo_default;\n");
-    return builder.result();
-  }
-
-  const propsType = findPropsType(keep);
-  builder.text(
-    `const __turbo_default = (props: ${propsType})${returnAnnotation} => {\n`,
-  );
-  for (const stmt of setup) {
-    builder.copy(source, stmt.start!, stmt.end!);
-    builder.text("\n");
-  }
+  builder.text(`const ${FACTORY} = (${params})${returnAnnotation} => {\n`);
+  if (!usesIO) builder.statements(source, setup);
   builder.text("return (\n");
   builder.copy(source, decl.start!, decl.end!);
-  builder.text("\n);\n};\nexport default __turbo_default;\n");
+  builder.text(`\n);\n};\nexport default ${FACTORY};\n`);
 
   return builder.result();
 }

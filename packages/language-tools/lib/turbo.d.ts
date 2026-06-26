@@ -49,6 +49,7 @@ interface TurboHTMLAttributes extends TurboDOMAttributes, TurboAriaAttributes {
   draggable?: boolean;
   slot?: string;
   children?: TurboChildren;
+  "test-id"?: string;
   [data: `data-${string}`]: string | number | boolean | undefined;
 }
 

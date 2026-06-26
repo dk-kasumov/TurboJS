@@ -7,7 +7,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
-    "build:example": "pnpm --filter counter build"
+    "build:example": "pnpm --filter turbofocus build"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",

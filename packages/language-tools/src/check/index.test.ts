@@ -19,8 +19,8 @@ describe("check (turbo-check)", () => {
     expect(result.errorCount, result.format()).toBe(0);
   });
 
-  it("passes the counter example end to end", () => {
-    const result = check(path.resolve("examples/counter/tsconfig.json"));
+  it("passes the turbofocus example end to end", () => {
+    const result = check(path.resolve("examples/turbofocus/tsconfig.json"));
     expect(result.errorCount, result.format()).toBe(0);
   });
 
