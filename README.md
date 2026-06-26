@@ -14,7 +14,24 @@ pnpm install                   # install the workspace
 pnpm --filter turbofocus dev   # run the demo at http://localhost:5180
 ```
 
-Other useful scripts:
+**Turn on the language server (important).** turbo type-checks the implicit `props` at the
+call site through a TypeScript plugin. Build it once (it isn't built by `pnpm install`), then
+point your editor at the *workspace* TypeScript so the plugin loads:
+
+```bash
+pnpm --filter @turbo/typescript-plugin build   # required — produces dist/index.js
+```
+
+Open any `.tsx` in `examples/turbofocus`, then select the workspace TypeScript version:
+
+- **macOS** — `⌘ ⇧ P` → *TypeScript: Select TypeScript Version* → *Use Workspace Version*
+- **Windows / Linux** — `Ctrl ⇧ P` → *TypeScript: Select TypeScript Version* → *Use Workspace Version*
+
+(If you'd already selected it, run *TypeScript: Restart TS Server* after building.)
+WebStorm / IntelliJ loads it automatically from `tsconfig.json`. For CI, run
+`node packages/language-tools/src/check/cli.ts <tsconfig.json>` (`turbo-check`).
+
+Other scripts:
 
 ```bash
 pnpm test                      # Vitest unit tests (all packages)
@@ -22,7 +39,10 @@ pnpm e2e                       # Playwright against examples/turbofocus
 pnpm --filter turbofocus build # production build of the demo
 ```
 
-A turbo app is an ordinary Vite app — add the plugin and point `esbuild` at `preserve`:
+## Use it in your own app
+
+A turbo app is an ordinary Vite app: add the plugin, keep JSX as `preserve`, and register the
+TypeScript plugin + JSX types.
 
 ```ts
 // vite.config.ts
@@ -31,12 +51,6 @@ import { turbo } from "@turbo/vite-plugin";
 
 export default defineConfig({ esbuild: { jsx: "preserve" }, plugins: [turbo()] });
 ```
-
-## Editor support
-
-turbo type-checks the implicit `props` at the call site. Enable it by adding the TypeScript
-plugin to your `tsconfig.json` and referencing the JSX types:
-
 ```jsonc
 // tsconfig.json
 { "compilerOptions": { "jsx": "preserve", "plugins": [{ "name": "@turbo/typescript-plugin" }] } }
@@ -45,15 +59,6 @@ plugin to your `tsconfig.json` and referencing the JSX types:
 // src/turbo-env.d.ts
 /// <reference types="@turbo/language-tools/turbo.d.ts" />
 ```
-
-- **VS Code** — run the [`@turbo/vscode`](packages/language-tools-vscode) extension (press
-  `F5` on that package), then **TypeScript: Select TypeScript Version → Use Workspace
-  Version**. The plugin hooks into the built-in TS service — no second language server.
-- **WebStorm / IntelliJ** — the IDE's bundled TypeScript service loads `plugins` from
-  `tsconfig.json` automatically; just keep the TypeScript Language Service enabled
-  (*Settings → Languages & Frameworks → TypeScript*).
-- **CI / headless** — `node packages/language-tools/src/check/cli.ts <tsconfig.json>`
-  (the `turbo-check` binary) reports the same diagnostics.
 
 ## A component
 
