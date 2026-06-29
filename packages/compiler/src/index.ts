@@ -1,4 +1,4 @@
-export { compile, type CompileResult } from "./compile.ts";
+export { compile, type CompileResult, type CompileOptions } from "./compile.ts";
 
 export {
   findDefaultExport,

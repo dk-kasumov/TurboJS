@@ -1,4 +1,4 @@
-import { batch, createRoot, effect, untrack, isAccessor } from "@turbo/reactivity";
+import { batch, createRoot, effect, untrack } from "@turbo/reactivity";
 
 export { effect };
 
@@ -62,6 +62,16 @@ function reconcile(parent: Node, marker: Node, current: Node[], next: Node[]): N
   return next;
 }
 
+const injectedStyles = new Set<string>();
+
+export function useStyle(css: string): void {
+  if (injectedStyles.has(css)) return;
+  injectedStyles.add(css);
+  const el = document.createElement("style");
+  el.textContent = css;
+  document.head.appendChild(el);
+}
+
 export function setAttr(el: Element, name: string, value: unknown): void {
   if (value == null || value === false) el.removeAttribute(name);
   else if (value === true) el.setAttribute(name, "");
@@ -71,7 +81,6 @@ export function setAttr(el: Element, name: string, value: unknown): void {
 export type Component<P = any> = (props: P) => Node;
 
 export function createComponent(component: unknown, props: any): unknown {
-  if (isAccessor(component)) return () => component();
   if (typeof component === "function") return untrack(() => component(props));
   return component;
 }

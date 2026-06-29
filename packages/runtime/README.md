@@ -12,8 +12,9 @@ The compiler emits calls into these helpers by name:
 | `insert(marker, value)` | render `value` before the marker; if it's a thunk, run it in an effect and reconcile on change (in-place text update fast path; arrays flatten; `null`/booleans drop) |
 | `setAttr(el, name, value)` | `null`/`false` removes, `true` sets `""`, else `String(value)` (always an attribute) |
 | `on(el, type, handler)` | `addEventListener`, with the handler wrapped in `batch` so one event = one flush |
-| `createComponent(c, props)` | resolve a component value — a function (called once, untracked), an accessor (kept reactive), or a Node (used as-is) |
+| `createComponent(c, props)` | resolve a component value — a function (called once, untracked) or a Node (used as-is) |
 | `render(component, container)` | mount under a `createRoot`; **returns a disposer** that unmounts and tears down the scope |
+| `useStyle(css)` | append a `<style>` to `<head>`; deduped by content, so a component's scoped CSS is injected once even across instances |
 
 Reactivity is decided here, not in the compiler: a thunk passed to `insert` runs inside an
 effect, so only the affected marker's nodes update — no virtual DOM, no component re-render.

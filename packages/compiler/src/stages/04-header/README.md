@@ -17,3 +17,9 @@ import { template as _$template, insert as _$insert, on as _$on, nodeAt as _$nod
 const _tmpl$0 = _$template("<button><!></button>");
 ```
 (`template` is added here, since this stage is what emits `_$template(...)`.)
+
+If the [scope step](../../scope.ts) set `unit.scope`, this stage also adds the `useStyle`
+helper and prepends the module-level style injection (`const _css$ = "…"; _$useStyle(_css$)`)
+— so the component's scoped CSS is injected once when the module is first imported. The
+codegen lives in [`encapsulation/inject.ts`](../../encapsulation/inject.ts); this stage just
+splices its statements in.
