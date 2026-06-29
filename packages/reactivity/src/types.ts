@@ -14,6 +14,7 @@ export type Source = Set<Reaction>;
 
 export class Reaction {
   run: Callback = () => {};
+  notify: Callback = () => {};
   readonly deps = new Set<Source>();
   readonly cleanups: Callback[] = [];
   owner: Reaction | null = null;

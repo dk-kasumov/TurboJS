@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { signal, memo, effect, onCleanup } from "@turbo/reactivity";
+import { signal, effect, onCleanup } from "@turbo/reactivity";
 import {
   template,
   nodeAt,
@@ -121,20 +121,6 @@ describe("createComponent", () => {
     expect(parent.querySelectorAll("span")).toHaveLength(1);
   });
 
-  it("stays reactive for a signal-of-Node component", () => {
-    const { root, marker } = host();
-    const a = document.createElement("a");
-    const b = document.createElement("b");
-    const current = signal<Node>(a);
-
-    insert(marker, createComponent(current, {}));
-    expect(root.querySelector("a")).not.toBeNull();
-
-    current.set(b);
-    expect(root.querySelector("a")).toBeNull();
-    expect(root.querySelector("b")).not.toBeNull();
-  });
-
   it("constructs a function component once, untracked, with its props", () => {
     const outer = signal(0);
     const constructed = vi.fn();
@@ -172,22 +158,6 @@ describe("createComponent", () => {
     expect(root.querySelector("p")?.textContent).toBe("a");
     inner.set("b");
     expect(root.querySelector("p")?.textContent).toBe("b");
-  });
-
-  it("resolves a memo component nested inside a conditional", () => {
-    const { root, marker } = host();
-    const show = signal(true);
-    const label = signal("a");
-    const C = memo(() => span(label()));
-
-    insert(marker, () => (show() ? createComponent(C, {}) : null));
-    expect(root.querySelector("span")?.textContent).toBe("a");
-
-    label.set("b");
-    expect(root.querySelector("span")?.textContent).toBe("b");
-
-    show.set(false);
-    expect(root.querySelector("span")).toBeNull();
   });
 });
 

@@ -49,11 +49,20 @@ its own folder under [`src/stages`](src/stages) with a README:
 
 ```
 01-parse     source .tsx → Babel AST + a fresh Unit
+  scope      read the `config` export → resolve + scope the component's CSS (see below)
 02-lower     every JSX root → DOM-building IIFE; fills templates + helpers used
 03-factory   wrap the module body into a per-instance (props) factory; bind input/output
 04-header    prepend the runtime import + hoisted `const _tmpl$N = _$template(...)`
 05-generate  print the AST back to code + source map
 ```
+
+[`scope.ts`](src/scope.ts) runs between parse and lower: it finds `export const config`,
+reads it statically via [`utils/ast-value`](src/utils/ast-value.ts), and sets a
+**mode-agnostic** `unit.scope = { attr, css }`. The choice of *how* to scope is a
+Strategy ([`encapsulation/`](src/encapsulation)) — `emulated` rewrites CSS selectors with
+`postcss-selector-parser` and returns the stamp attribute; `none` returns `attr: null`.
+Downstream stages never branch on the mode: lower stamps `unit.scope?.attr` on every
+element, header injects the CSS once via `useStyle(_css$)`.
 
 The seam between stages is the `Unit` — stage 04 reads what stage 02 collected without
 importing it. Lowering recurses into expressions, so JSX inside `{cond ? <A/> : <B/>}` and

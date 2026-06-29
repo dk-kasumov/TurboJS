@@ -2,6 +2,7 @@ import * as t from "@babel/types";
 
 export const RUNTIME_HELPERS = [
   "template", "insert", "effect", "setAttr", "on", "nodeAt", "createComponent",
+  "useStyle",
 ] as const;
 
 export type RuntimeHelper = (typeof RUNTIME_HELPERS)[number];

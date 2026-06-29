@@ -99,6 +99,8 @@ export default <h1>{title()}</h1>; // <Header title={name()} /> keeps it live
 - **List rendering** — `{items().map((x) => <li>{x}</li>)}` (re-rendered wholesale, not yet keyed).
 - **Components as values** — bind JSX to a variable, a `memo`, or a `signal<JSX.Element>`.
 - **Native attribute names** — `class`, `for` (no `className`/`htmlFor` rewriting).
+- **CSS encapsulation** — `export const config = component({ styles })` scopes a component's
+  CSS (emulated, Angular/Vue-style attribute scoping); `Encapsulation.None` opts out.
 - **Editor + CLI type-checking** — props are type-checked at the call site despite the
   implicit `props`, via a Volar virtual-code layer and the `turbo-check` CLI.
 
@@ -108,7 +110,8 @@ export default <h1>{title()}</h1>; // <Header title={name()} /> keeps it live
   replaces a list's nodes wholesale, à la Solid's move to keyed diffing).
 - **Component children / slots** — `<Card>…</Card>` currently drops its children.
 - **JSX fragments** — `<>…</>` for component roots and branches (today they throw).
-- **Style encapsulation** — scoped/SCSS styles per component.
+- **Parent → child-host styling** — a parent styling a child component's root element (full
+  Angular emulated parity); today a component scopes only its own template.
 
 ## How it works
 
@@ -117,9 +120,9 @@ layers meet at a thin named contract — the compiler emits *calls* by name and 
 dynamic expression in a thunk; it never decides what is reactive:
 
 ```
-.tsx ─▶ vite-plugin ─▶ compiler (parse ▸ lower ▸ factory ▸ header ▸ generate) ─▶ runtime calls ─▶ DOM
-                                                                                    ▲
-                                                                            reactivity (signals)
+.tsx ─▶ vite-plugin ─▶ compiler (parse ▸ scope ▸ lower ▸ factory ▸ header ▸ generate) ─▶ runtime calls ─▶ DOM
+                                                                                          ▲
+                                                                                  reactivity (signals)
 ```
 
 | Package | Role |
@@ -127,7 +130,7 @@ dynamic expression in a thunk; it never decides what is reactive:
 | [`@turbo/reactivity`](packages/reactivity) | signals, `effect`, `memo`, `batch`, owner tree — change detection |
 | [`@turbo/runtime`](packages/runtime) | the DOM contract the compiler targets (`template`, `insert`, `setAttr`, `on`, `render`) |
 | [`@turbo/compiler`](packages/compiler) | TSX → fine-grained DOM-building JS (a 5-stage pipeline) |
-| [`@turbo/core`](packages/core) | authoring API: `input`, `output`, `onDestroy` |
+| [`@turbo/core`](packages/core) | authoring API: `input`, `output`, `onDestroy`, `component` (CSS encapsulation) |
 | [`@turbo/vite-plugin`](packages/vite-plugin) | runs the compiler as an `enforce: "pre"` Vite transform |
 | [`@turbo/language-tools`](packages/language-tools) | virtual TSX for type-checking + the `turbo-check` CLI |
 | [`@turbo/typescript-plugin`](packages/typescript-plugin) · [`@turbo/vscode`](packages/language-tools-vscode) | editor integration |

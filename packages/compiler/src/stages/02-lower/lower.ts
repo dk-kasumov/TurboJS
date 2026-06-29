@@ -27,6 +27,12 @@ import {
 } from "../../utils/ast.utils.ts";
 
 class TemplateLowerer {
+  private readonly scopeAttr: string | null;
+
+  constructor(scopeAttr: string | null = null) {
+    this.scopeAttr = scopeAttr;
+  }
+
   lower(root: JSXElement): Template {
     const parts: Part[] = [];
     const html = this.element(root, [], parts);
@@ -36,10 +42,11 @@ class TemplateLowerer {
   private element(node: JSXElement, path: number[], parts: Part[]): string {
     const tag = elementName(node);
     const attrs = this.attributes(node, path, parts);
+    const stamp = this.scopeAttr ? ` ${this.scopeAttr}` : "";
     const children = this.children(node, path, parts);
     return VOID_ELEMENTS.has(tag)
-      ? `<${tag}${attrs}>`
-      : `<${tag}${attrs}>${children}</${tag}>`;
+      ? `<${tag}${attrs}${stamp}>`
+      : `<${tag}${attrs}${stamp}>${children}</${tag}>`;
   }
 
   private attributes(node: JSXElement, path: number[], parts: Part[]): string {
@@ -198,7 +205,7 @@ class TemplateEmitter {
 }
 
 export function lower(unit: Unit): Unit {
-  const lowerer = new TemplateLowerer();
+  const lowerer = new TemplateLowerer(unit.scope?.attr ?? null);
   const emitter = new TemplateEmitter();
   const collector = new HelperCollector();
 

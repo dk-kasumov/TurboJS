@@ -2,6 +2,8 @@ import type { LanguagePlugin, VirtualCode } from "@volar/language-core";
 import type { TypeScriptServiceScript } from "@volar/typescript";
 import { TurboVirtualCode } from "./virtual-code.ts";
 
+export { findStyleLink, type StyleLink } from "./style-link.ts";
+
 export function createTurboLanguagePlugin<T>(
   ts: typeof import("typescript"),
 ): LanguagePlugin<T> {

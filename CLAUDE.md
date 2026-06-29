@@ -48,8 +48,8 @@ in the wrong layer. See `.claude/skills/solid-gof`.
 | --- | --- |
 | `packages/reactivity` | signals, `effect`, `memo`, `batch`, `untrack`, `onCleanup`, `createRoot` — change detection |
 | `packages/runtime` | DOM contract: `template`, `nodeAt`, `insert`, `setAttr`, `on`, `createComponent`, `render` |
-| `packages/compiler` | TSX → fine-grained DOM JS (5-stage pipeline under `src/stages`: parse → lower → factory → header → generate) |
-| `packages/core` | authoring API: `input`, `output`, `onDestroy` (compiler rewrites these to `_$input`/`_$output`) |
+| `packages/compiler` | TSX → fine-grained DOM JS (5-stage pipeline under `src/stages`: parse → lower → factory → header → generate; plus a `scope` step for CSS encapsulation) |
+| `packages/core` | authoring API: `input`, `output`, `onDestroy`, `component` (compiler rewrites these to `_$input`/`_$output`; reads & strips `component()`) |
 | `packages/vite-plugin` | `enforce: "pre"` Vite transform that runs the compiler |
 | `packages/language-tools` | Volar virtual code + `turbo-check` CLI + `turbo.d.ts` JSX types |
 | `packages/typescript-plugin` | wraps language-tools as a TS Server plugin (editor) |
@@ -101,6 +101,31 @@ props type is found by convention: a top-level `interface Props` / `type Props`,
 derived from `input()`/`output()` bindings, else `TurboProps` (= `Record<string, any>`,
 unchecked).
 
+## CSS encapsulation
+
+A component opts into scoped styles with `export const config = component({ styles, encapsulation })`
+(from `@turbo/core`). `component()` is a **compile-time marker** like `input`/`output` — it
+throws at runtime; the compiler reads the `config` export statically and strips it.
+
+The pipeline keeps the encapsulation mode out of the stages — it is a **Strategy**:
+
+- [`scope.ts`](packages/compiler/src/scope.ts) (runs between parse and lower) finds the
+  `config` export, reads it with [`utils/ast-value`](packages/compiler/src/utils/ast-value.ts)
+  (`staticValue`: AST literal → plain JS), resolves the CSS files via `options.resolveStyle`,
+  picks a strategy from [`encapsulation/`](packages/compiler/src/encapsulation), and sets a
+  **mode-agnostic** `unit.scope = { attr, css }`.
+- `emulated` (default) rewrites every selector with `postcss-selector-parser`
+  (`.btn` → `.btn[t-<hash>]`, `t-<hash>` is a `node:crypto` hash of the filename) and returns
+  that stamp attribute. `none` returns `attr: null` and leaves the CSS global.
+- Downstream stages **never branch on the mode**: lower stamps `unit.scope?.attr` on every
+  element; header injects the CSS once at module level via `useStyle(_css$)` (codegen in
+  [`encapsulation/inject.ts`](packages/compiler/src/encapsulation/inject.ts)). The factory is
+  untouched.
+
+`Encapsulation` is a **const-object enum**, not a TS `enum` — a real enum is non-erasable and
+breaks Node's strip-only loader (same trap as parameter properties). The vite-plugin supplies
+`resolveStyle` (reads the `.css` + `addWatchFile` for HMR).
+
 ## Gotchas / current limitations
 
 - **Conditionals and lists work** — lowering recurses into expressions, so
@@ -109,13 +134,17 @@ unchecked).
 - **No fragment support** — root `<>...</>` throws; nested fragments throw.
 - **Components ignore children** — only attributes are mapped; `<Card>x</Card>` drops `x`. No slots.
 - **No `ref`** — `ref={el}` is treated as an ordinary attribute (`setAttr("ref", …)`).
-- **Reactivity scheduler** is synchronous but **not fully glitch-free** (a sink reading both a
-  source and a memo of that source can run twice) and has **no cycle detection**. `render`
-  returns a **disposer**, not a `Node`.
+- **Reactivity scheduler** is synchronous: a write **eagerly** marks dependent memos stale
+  (so a memo read inside the same `batch` that changed its dependency reads fresh) and defers
+  dependent effects to a deduped flush. It has **no cycle detection**. `render` returns a
+  **disposer**, not a `Node`.
 - **`setAttr` always uses `setAttribute`** — DOM *properties* like an input's live `value`
   or `checked` are not set; controlled inputs won't fully work.
 - **`getLanguageId` treats every `.tsx` as a turbo module** (falls back to identity if there
   is no default export or it is already a function).
+- **CSS encapsulation is emulated-only** — no shadow DOM. A component scopes only its **own**
+  template; a parent can't yet style a child component's host element (no parent→child-host
+  cross-stamp). Styles are injected per module on import (deduped by content), never removed.
 
 Each package has a `README.md` with its design and data flow; the compiler's stages are
 documented per-folder under `packages/compiler/src/stages`.

@@ -42,13 +42,15 @@ signal internals.
   Disposal recurses children-first, then unsubscribes deps, then runs cleanups. Because an
   effect disposes itself before each re-run, anything it created last time is torn down
   first — so effects-inside-effects (and swapped-out DOM content) never leak.
-- **Scheduler** — writes enqueue observers into one global `Set` and `flush()` drains it to
-  a fixpoint. Set-deduping makes the diamond `a → b,c → sink` run the sink **once**.
+- **Scheduler** — a write **eagerly** marks dependent memos stale (pushing staleness through
+  the memo graph synchronously, even inside a `batch`) and schedules dependent effects into
+  one global `Set`; values are recomputed lazily on read and `flush()` drains the effect
+  queue to a fixpoint. Eager invalidation means a memo read in the same batch that changed
+  its dependency returns the fresh value; Set-deduping makes the diamond `a → b,c → sink` run
+  the sink **once** per change.
 
 ### Known sharp edges
 
-- Not fully glitch-free: a sink reading **both** a source and a memo of that source can run
-  twice.
 - No cycle detection: an effect that writes a signal it also reads will loop.
 
 ## Tests

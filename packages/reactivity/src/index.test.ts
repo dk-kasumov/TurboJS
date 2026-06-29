@@ -137,6 +137,19 @@ describe("batch", () => {
 
     expect(spy).toHaveBeenLastCalledWith(2);
   });
+
+  it("reads a memo fresh after its dependency changes within the same batch", () => {
+    const minutes = signal(2);
+    const seconds = memo(() => minutes() * 60);
+    let read = 0;
+
+    batch(() => {
+      minutes.set(1);
+      read = seconds();
+    });
+
+    expect(read).toBe(60);
+  });
 });
 
 describe("onCleanup", () => {

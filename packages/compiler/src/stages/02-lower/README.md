@@ -34,4 +34,9 @@ becomes (and `templates += "<button><!></button>"`, `helpers += {nodeAt, on, ins
 A bare `<Foo a={x} />` root lowers to a `createComponent(Foo, {...})` call
 instead of a template. Fragments (`<>…</>`) throw — not supported yet.
 
+If the [scope step](../../scope.ts) set `unit.scope.attr` (emulated CSS encapsulation),
+the lowerer stamps that attribute onto every native element's opening tag — e.g.
+`<button class="btn">` → `<button class="btn" t-1a2b3c>`. It reads the attribute off the
+`Unit` and never checks the encapsulation mode.
+
 `ir.ts` is **only** used inside this stage; no other layer imports it.

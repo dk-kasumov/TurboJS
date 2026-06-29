@@ -10,10 +10,22 @@ export interface OutputEmitter<T> {
   emit(value: T): void;
 }
 
+export const Encapsulation = {
+  Emulated: "emulated",
+  None: "none",
+} as const;
+
+export type Encapsulation = (typeof Encapsulation)[keyof typeof Encapsulation];
+
+export interface ComponentConfig {
+  encapsulation?: Encapsulation;
+  styles?: string | string[];
+}
+
 type Props = Record<string, unknown>;
 
 const UNCOMPILED =
-  "turbo: input()/output() are compile-time markers — run the turbo compiler";
+  "turbo: input()/output()/component() are compile-time markers — run the turbo compiler";
 
 export function input<T>(initial: T): InputSignal<T>;
 export function input<T>(): InputSignal<T | undefined>;
@@ -28,6 +40,10 @@ export namespace input {
 }
 
 export function output<T = void>(): OutputEmitter<T> {
+  throw new Error(UNCOMPILED);
+}
+
+export function component(_config: ComponentConfig): void {
   throw new Error(UNCOMPILED);
 }
 

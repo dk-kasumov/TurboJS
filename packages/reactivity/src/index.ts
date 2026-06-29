@@ -10,13 +10,8 @@ let batchDepth = 0;
 let flushing = false;
 const queue = new Set<Reaction>();
 
-function enqueue(observers: Source): void {
-  for (const observer of observers) queue.add(observer);
-}
-
-function notify(observers: Source): void {
-  enqueue(observers);
-  if (batchDepth === 0) flush();
+function propagate(observers: Source): void {
+  for (const observer of observers) observer.notify();
 }
 
 function flush(): void {
@@ -104,7 +99,8 @@ export function signal<T>(initial: T): WritableSignal<T> {
   read.set = (next: T) => {
     if (Object.is(next, value)) return;
     value = next;
-    notify(observers);
+    propagate(observers);
+    if (batchDepth === 0) flush();
   };
 
   brand(read);
@@ -118,6 +114,10 @@ export function effect(fn: Callback): Callback {
   reaction.run = () => {
     dispose(reaction);
     runWith(reaction, reaction, fn);
+  };
+
+  reaction.notify = () => {
+    queue.add(reaction);
   };
 
   reaction.run();
@@ -136,10 +136,10 @@ export function memo<T>(fn: () => T): Accessor<T> {
   let value: T;
   let stale = true;
 
-  reaction.run = () => {
+  reaction.notify = () => {
     if (stale) return;
     stale = true;
-    enqueue(observers);
+    propagate(observers);
   };
 
   const read = () => {
